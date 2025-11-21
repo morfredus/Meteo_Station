@@ -68,12 +68,12 @@ bool gpsFixNotified = false;
 int currentPage = 0;
 const int TOTAL_PAGES = 6; 
 // ID Mapping:
-// 0: Résumé
+// 0: RÃ©sumÃ©
 // 1: Environnement
-// 2: Prévisions (New position)
+// 2: PrÃ©visions (New position)
 // 3: Alertes (New position, conditional)
 // 4: GPS (New position)
-// 5: Réseau (New position)
+// 5: RÃ©seau (New position)
 
 unsigned long lastTimeSensor = 0;
 unsigned long lastTimeWeather = 0;
@@ -234,7 +234,7 @@ void handleButtonLogic() {
     currentPage++;
     
     // === LOGIQUE DE SAUT DE PAGE ===
-    // Si on arrive sur la page 3 (Alertes) et qu'il n'y a PAS d'alerte, on saute à la suivante
+    // Si on arrive sur la page 3 (Alertes) et qu'il n'y a PAS d'alerte, on saute Ã  la suivante
     if (currentPage == 3 && !alertActive) {
         currentPage++; 
     }
@@ -348,7 +348,7 @@ void updateSensors() {
   else { alertActive = false; }
 
   // === LOGIQUE AUTO-DISPLAY ALERTE ===
-  // Si une alerte se déclenche (Front montant) -> On force l'affichage
+  // Si une alerte se dÃ©clenche (Front montant) -> On force l'affichage
   if (alertActive && !lastAlertActive) {
       currentPage = 3; // Force page Alerte
       beep(5, 100); // Alerte sonore insistante
@@ -372,8 +372,8 @@ void drawFullPage() {
   tft.setTextColor(C_GREY); tft.setTextSize(1);
   tft.setCursor(5, 225); 
   
-  // Calcul dynamique du numéro de page affiché pour ne pas perturber l'utilisateur
-  // Si Alerte cachée: Page 1=1, 2=2, 3(Prevision)=3, 4(GPS)=4, 5(Reseau)=5. 
+  // Calcul dynamique du numÃ©ro de page affichÃ© pour ne pas perturber l'utilisateur
+  // Si Alerte cachÃ©e: Page 1=1, 2=2, 3(Prevision)=3, 4(GPS)=4, 5(Reseau)=5. 
   // Mais en interne GPS est 4. On simplifie l'affichage "Page X" pour le debug ou on laisse X/6.
   tft.printf("Page %d/%d", currentPage + 1, TOTAL_PAGES);
   
@@ -391,18 +391,18 @@ void drawFullPage() {
     tft.setCursor(10, 80); tft.print("HUMIDITE"); tft.setCursor(120, 80); tft.print("PRESSION");
     tft.setCursor(10, 140); tft.print("LUMINOSITE"); tft.setCursor(120, 140); tft.print("ALTITUDE");
   }
-  else if (currentPage == 2) { // PREVISIONS (Bougé ici)
+  else if (currentPage == 2) { // PREVISIONS (BougÃ© ici)
      tft.setCursor(10, 45); tft.print("PREVISIONS (3J)"); tft.drawLine(10, 65, 230, 65, C_GREY);
      tft.drawLine(10, 115, 230, 115, 0x2104);
      tft.drawLine(10, 165, 230, 165, 0x2104);
   }
-  else if (currentPage == 3) { // ALERTES (Bougé ici)
+  else if (currentPage == 3) { // ALERTES (BougÃ© ici)
     tft.setCursor(10, 45); tft.print("ETAT ALERTES"); tft.drawLine(10, 65, 230, 65, C_GREY);
   }
-  else if (currentPage == 4) { // GPS (Bougé ici)
+  else if (currentPage == 4) { // GPS (BougÃ© ici)
     tft.setCursor(10, 45); tft.print("DONNEES GPS"); tft.drawLine(10, 65, 230, 65, C_GREY);
   }
-  else if (currentPage == 5) { // RESEAU (Bougé ici)
+  else if (currentPage == 5) { // RESEAU (BougÃ© ici)
      tft.setCursor(10, 45); tft.print("RESEAU & SYS"); tft.drawLine(10, 65, 230, 65, C_GREY);
   }
 }
