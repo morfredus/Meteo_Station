@@ -1,55 +1,31 @@
-### 1\. `API_REFERENCE.md` (English)
-
-````markdown
 # API Reference
 
-The ESP32-S3 Weather Station exposes a local Web Server providing real-time data in JSON format.
+## Local JSON API
 
-## Base URL
-`http://<IP_ADDRESS_OF_ESP32>`
+The device hosts a web server that exposes a JSON API endpoint for real-time data.
 
----
+**Endpoint:** `GET /api/data`
 
-## HTTP Endpoints
+### Response Body
 
-### `GET /api/data`
-Returns all available sensor readings, local weather data, GPS status, and system alerts in a single JSON object.
-
-**Response Structure:**
+The JSON object contains sensor readings and system status.
 
 ```json
 {
-  "sensor": {
-    "temp": 22.5,      // Internal Temperature (C)
-    "hum": 45,         // Internal Humidity (%)
-    "pres": 1013.2,    // Pressure (hPa) - Optional depending on sensor init
-    "lux": 1200        // Light Level (0-4095)
-  },
-  "weather": {
-    "temp": 21.0,      // External Temperature from API (C)
-    "code": 1          // WMO Weather Code (0=Clear, 1-3=Cloudy, etc.)
-  },
-  "gps": {
-    "lat": 44.8378,    // Latitude
-    "lon": -0.5792,    // Longitude
-    "valid": true      // true if real GPS fix, false if default/simulation
-  },
-  "alert": false       // true if a temperature alert is active
+  "temperature": 23.5,
+  "humidity": 45.8,
+  "pressure": 1013.25,
+  "altitude": 150.5,
+  "gps_lat": 48.8584,
+  "gps_lon": 2.2945,
+  "gps_sats": 8,
+  "uptime": "1d 02:30:45",
+  "free_heap": 123456,
+  "cpu_freq": 240,
+  "wifi_rssi": -55
 }
-````
+```
 
-**Status Codes:**
+## External APIs
 
-  * `200 OK`: Request successful.
-
------
-
-## Telegram Bot Commands
-
-You can interact with the station via the Telegram Chat ID configured in `secrets.h`.
-
-| Command | Description |
-| :--- | :--- |
-| `/start` | Checks connection and returns the current firmware version. |
-| `/status` | Returns an immediate text summary of internal sensors and external weather. |
-| `/reboot` | Remotely restarts the ESP32 module. |
+- **Open-Meteo:** Used to fetch weather forecast data. The request now includes the `daily` parameter to get 3-day forecasts.

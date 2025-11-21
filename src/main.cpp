@@ -61,19 +61,12 @@ struct GPSData {
 } currentGPS;
 
 bool alertActive = false;
-bool lastAlertActive = false; // Pour detection changement etat
-String alertMessage = "Aucune alerte";
+bool lastAlertActive = false; 
+String alertMessage = "Aucune";
 bool gpsFixNotified = false;
 
 int currentPage = 0;
 const int TOTAL_PAGES = 6; 
-// ID Mapping:
-// 0: Résumé
-// 1: Environnement
-// 2: Prévisions (New position)
-// 3: Alertes (New position, conditional)
-// 4: GPS (New position)
-// 5: Réseau (New position)
 
 unsigned long lastTimeSensor = 0;
 unsigned long lastTimeWeather = 0;
@@ -83,19 +76,11 @@ unsigned long lastDisplayUpdate = 0;
 // ================= INTERRUPTIONS =================
 volatile bool flagPagePressed = false;
 volatile bool flagActionPressed = false;
-unsigned long lastDebounceTime = 0;
-const unsigned long DEBOUNCE_DELAY = 200;
+unsigned long lastButtonActionTime = 0; 
+const unsigned long REFRACTORY_PERIOD = 300; 
 
-void IRAM_ATTR isrPageBtn() {
-  if (millis() - lastDebounceTime > DEBOUNCE_DELAY) {
-    flagPagePressed = true; lastDebounceTime = millis();
-  }
-}
-void IRAM_ATTR isrActionBtn() {
-  if (millis() - lastDebounceTime > DEBOUNCE_DELAY) {
-    flagActionPressed = true; lastDebounceTime = millis();
-  }
-}
+void IRAM_ATTR isrPageBtn() { flagPagePressed = true; }
+void IRAM_ATTR isrActionBtn() { flagActionPressed = true; }
 
 // ================= PROTOTYPES =================
 void drawStartupScreen(); 
@@ -108,6 +93,8 @@ void drawFullPage();
 void beep(int count, int duration);
 void setNeoPixelStatus();
 void handleButtonLogic();
+void drawSunRays(int cx, int cy, int offsetAngle, uint16_t color);
+String getUptime();
 
 // ================= SETUP =================
 void setup() {
@@ -140,7 +127,7 @@ void setup() {
   tft.setRotation(TFT_ROTATION);
   tft.fillScreen(C_BLACK);
   
-  drawStartupScreen();
+  drawStartupScreen(); 
   initSensors();
 
   configTime(3600, 3600, "pool.ntp.org");
@@ -179,7 +166,12 @@ void setup() {
 void loop() {
   unsigned long now = millis();
 
-  while (Serial2.available() > 0) gps.encode(Serial2.read());
+  // Optimisation GPS : On vide le buffer UART complètement à chaque cycle
+  // Cela assure qu'on traite les données le plus vite possible
+  while (Serial2.available() > 0) {
+    gps.encode(Serial2.read());
+  }
+
   if (gps.location.isUpdated()) {
     currentGPS.lat = gps.location.lat();
     currentGPS.lon = gps.location.lng();
@@ -228,37 +220,67 @@ void loop() {
 // ================= LOGIQUE METIER =================
 
 void handleButtonLogic() {
+  if (millis() - lastButtonActionTime < REFRACTORY_PERIOD) {
+      flagPagePressed = false; flagActionPressed = false; return; 
+  }
+
+  // --- BOUTON PAGE (Changement Ecran) ---
   if (flagPagePressed) {
     beep(1, 50);
     flagPagePressed = false;
-    currentPage++;
+    lastButtonActionTime = millis();
     
-    // === LOGIQUE DE SAUT DE PAGE ===
-    // Si on arrive sur la page 3 (Alertes) et qu'il n'y a PAS d'alerte, on saute à la suivante
-    if (currentPage == 3 && !alertActive) {
-        currentPage++; 
-    }
-
+    currentPage++;
     if (currentPage >= TOTAL_PAGES) currentPage = 0;
-    drawFullPage(); refreshDisplayData();
+    
+    drawFullPage(); 
+    refreshDisplayData();
   }
+
+  // --- BOUTON ACTION (Mise à jour Météo) ---
   if (flagActionPressed) {
     beep(1, 50);
     flagActionPressed = false;
-    tft.setCursor(220, 5); tft.setTextColor(C_YELLOW, C_BLUE); tft.print("*");
-    fetchWeather(); refreshDisplayData();
+    lastButtonActionTime = millis();
+    
+    // Feedback Visuel IMMEDIAT avant le blocage réseau
+    tft.setCursor(200, 5); 
+    tft.setTextColor(C_YELLOW, C_BLUE); 
+    tft.print("MAJ..."); 
+    
+    fetchWeather(); 
+    
+    // Nettoyage après coup
+    tft.fillRect(200, 0, 40, 20, C_BLUE);
+    refreshDisplayData();
   }
+}
+
+String getUptime() {
+    unsigned long sec = millis() / 1000;
+    unsigned long min = sec / 60;
+    unsigned long hr = min / 60;
+    unsigned long day = hr / 24;
+    sec %= 60; min %= 60; hr %= 24;
+    char buf[20]; sprintf(buf, "%dd %02dh %02dm", day, hr, min);
+    return String(buf);
 }
 
 void fetchWeather() {
   if (wifiMulti.run() != WL_CONNECTED) return;
+  
   HTTPClient http;
+  // Timeout de 3 secondes pour eviter le freeze prolongé
+  http.setTimeout(3000); 
+
   String url = String("http://api.open-meteo.com/v1/forecast?latitude=") + 
                String(currentGPS.lat, 4) + "&longitude=" + String(currentGPS.lon, 4) + 
                "&current=temperature_2m,weather_code,pressure_msl&daily=weather_code,temperature_2m_max,temperature_2m_min&timezone=auto";
   
   http.begin(url);
-  if (http.GET() == 200) {
+  int httpCode = http.GET(); // Bloque ici, mais max 3 sec
+
+  if (httpCode == 200) {
     String payload = http.getString();
     JsonDocument doc;
     DeserializationError error = deserializeJson(doc, payload);
@@ -301,33 +323,41 @@ void handleTelegram() {
   }
 }
 
+void drawSunRays(int cx, int cy, int offsetAngle, uint16_t color) {
+    for (int i = 0; i < 8; i++) {
+        float angle = (i * 45 + offsetAngle) * 3.14 / 180.0;
+        int x1 = cx + cos(angle) * 35; int y1 = cy + sin(angle) * 35;
+        int x2 = cx + cos(angle) * 45; int y2 = cy + sin(angle) * 45;
+        tft.drawLine(x1, y1, x2, y2, color);
+        tft.drawLine(x1+1, y1, x2+1, y2, color);
+    }
+}
+
 void drawStartupScreen() {
   tft.fillScreen(C_BLACK);
-  drawSun(tft, 120, 80); 
-  
+  tft.fillCircle(120, 90, 30, C_ORANGE); tft.fillCircle(120, 90, 25, C_YELLOW);
   tft.setTextSize(2); tft.setTextColor(C_WHITE);
-  tft.setCursor(40, 140); tft.print("METEO STATION");
+  tft.setCursor(40, 150); tft.print("METEO STATION");
   tft.setTextSize(1); tft.setTextColor(C_GREY);
-  tft.setCursor(90, 165); tft.print("v"); tft.print(PROJECT_VERSION);
+  tft.setCursor(90, 175); tft.print("v"); tft.print(PROJECT_VERSION);
 
   wifiMulti.addAP(ssid_1, password_1);
   wifiMulti.addAP(ssid_2, password_2);
+  tft.setCursor(50, 210); tft.setTextColor(C_WHITE); tft.print("Connexion WiFi...");
 
-  tft.drawRect(40, 200, 160, 10, C_WHITE);
-  tft.setCursor(40, 185); tft.setTextColor(C_WHITE); tft.print("Connexion WiFi...");
-
-  int progress = 0;
+  int angle = 0;
   while (wifiMulti.run() != WL_CONNECTED) {
-    progress += 5; if (progress > 156) progress = 0;
-    tft.fillRect(42, 202, 156, 6, C_BLACK);
-    tft.fillRect(42, 202, progress, 6, C_GREEN);
+    drawSunRays(120, 90, angle, C_BLACK);
+    angle += 10; if (angle >= 360) angle = 0;
+    drawSunRays(120, 90, angle, C_YELLOW);
     while (Serial2.available() > 0) gps.encode(Serial2.read());
     delay(100);
   }
-  tft.fillRect(42, 202, 156, 6, C_GREEN);
-  beep(2, 100);
-  tft.setCursor(40, 215); tft.setTextColor(C_GREEN); tft.print("Succes: " + WiFi.SSID());
-  delay(1500);
+  drawSunRays(120, 90, angle, C_YELLOW);
+  tft.fillRect(0, 200, 240, 40, C_BLACK); 
+  tft.setCursor(10, 210); tft.setTextColor(C_GREEN); tft.setTextSize(1);
+  tft.print("Connecte: "); tft.println(WiFi.SSID());
+  beep(2, 100); delay(1500);
 }
 
 void initSensors() {
@@ -347,13 +377,10 @@ void updateSensors() {
   else if (localSensor.temp < ALERT_TEMP_LOW) { alertActive = true; alertMessage = "Temp BASSE"; }
   else { alertActive = false; }
 
-  // === LOGIQUE AUTO-DISPLAY ALERTE ===
-  // Si une alerte se déclenche (Front montant) -> On force l'affichage
   if (alertActive && !lastAlertActive) {
-      currentPage = 3; // Force page Alerte
-      beep(5, 100); // Alerte sonore insistante
-      drawFullPage();
-      refreshDisplayData();
+      currentPage = 5; 
+      beep(5, 100); 
+      drawFullPage(); refreshDisplayData();
   }
   lastAlertActive = alertActive;
 }
@@ -365,18 +392,12 @@ void setNeoPixelStatus() {
   pixels.show();
 }
 
-// ================= AFFICHAGE REORGANISE =================
+// ================= AFFICHAGE =================
 void drawFullPage() {
   tft.fillScreen(C_BLACK); 
   tft.fillRect(0, 0, TFT_WIDTH, 35, C_BLUE); 
   tft.setTextColor(C_GREY); tft.setTextSize(1);
-  tft.setCursor(5, 225); 
-  
-  // Calcul dynamique du numéro de page affiché pour ne pas perturber l'utilisateur
-  // Si Alerte cachée: Page 1=1, 2=2, 3(Prevision)=3, 4(GPS)=4, 5(Reseau)=5. 
-  // Mais en interne GPS est 4. On simplifie l'affichage "Page X" pour le debug ou on laisse X/6.
-  tft.printf("Page %d/%d", currentPage + 1, TOTAL_PAGES);
-  
+  tft.setCursor(5, 225); tft.printf("Page %d/%d", currentPage + 1, TOTAL_PAGES);
   tft.setTextColor(C_WHITE); tft.setTextSize(2);
 
   if (currentPage == 0) { // RESUME
@@ -385,30 +406,31 @@ void drawFullPage() {
     tft.setCursor(10, 130); tft.print("EXTERIEUR");
     tft.drawLine(10, 150, 230, 150, C_GREY);
   }
-  else if (currentPage == 1) { // DETAILS ENVIRONNEMENT
+  else if (currentPage == 1) { // ENVIRONNEMENT
     tft.setCursor(10, 45); tft.print("ENVIRONNEMENT"); tft.drawLine(10, 65, 230, 65, C_GREY);
     tft.setTextSize(1); tft.setTextColor(C_GREY);
     tft.setCursor(10, 80); tft.print("HUMIDITE"); tft.setCursor(120, 80); tft.print("PRESSION");
     tft.setCursor(10, 140); tft.print("LUMINOSITE"); tft.setCursor(120, 140); tft.print("ALTITUDE");
   }
-  else if (currentPage == 2) { // PREVISIONS (Bougé ici)
+  else if (currentPage == 2) { // PREVISIONS
      tft.setCursor(10, 45); tft.print("PREVISIONS (3J)"); tft.drawLine(10, 65, 230, 65, C_GREY);
      tft.drawLine(10, 115, 230, 115, 0x2104);
      tft.drawLine(10, 165, 230, 165, 0x2104);
   }
-  else if (currentPage == 3) { // ALERTES (Bougé ici)
-    tft.setCursor(10, 45); tft.print("ETAT ALERTES"); tft.drawLine(10, 65, 230, 65, C_GREY);
-  }
-  else if (currentPage == 4) { // GPS (Bougé ici)
+  else if (currentPage == 3) { // GPS
     tft.setCursor(10, 45); tft.print("DONNEES GPS"); tft.drawLine(10, 65, 230, 65, C_GREY);
   }
-  else if (currentPage == 5) { // RESEAU (Bougé ici)
+  else if (currentPage == 4) { // RESEAU
      tft.setCursor(10, 45); tft.print("RESEAU & SYS"); tft.drawLine(10, 65, 230, 65, C_GREY);
+  }
+  else if (currentPage == 5) { // ETAT SYSTEME
+    tft.setCursor(10, 45); tft.print("ETAT SYSTEME"); tft.drawLine(10, 65, 230, 65, C_GREY);
+    tft.drawLine(10, 120, 230, 120, 0x2104);
+    tft.drawLine(10, 180, 230, 180, 0x2104);
   }
 }
 
 void refreshDisplayData() {
-  // Header (Commun)
   int rssi = WiFi.RSSI();
   int bars = (rssi > -55) ? 4 : (rssi > -75) ? 3 : (rssi > -85) ? 2 : (rssi > -95) ? 1 : 0;
   tft.fillRect(5, 5, 25, 20, C_BLUE); 
@@ -427,15 +449,14 @@ void refreshDisplayData() {
 
   tft.setTextColor(C_WHITE, C_BLACK);
 
-  // MAPPING CONTENU
-  if (currentPage == 0) { // RESUME
+  if (currentPage == 0) { 
     tft.setTextSize(3);
     tft.setCursor(10, 80); tft.printf("%.1f C  ", localSensor.temp);
     tft.setCursor(10, 160); tft.printf("%.1f C  ", apiWeather.temp);
     tft.fillRect(180, 140, 50, 50, C_BLACK); 
     drawWeatherByCode(tft, 200, 165, apiWeather.weatherCode);
   }
-  else if (currentPage == 1) { // ENVIRONNEMENT
+  else if (currentPage == 1) {
     tft.setTextSize(2);
     tft.setCursor(10, 95); tft.printf("%.0f %% ", localSensor.hum);
     tft.setCursor(120, 95); if(isnan(localSensor.pres)) tft.print("-- hPa"); else tft.printf("%.0f hPa", localSensor.pres);
@@ -447,7 +468,7 @@ void refreshDisplayData() {
         tft.printf("%.0f m  ", altBaro);
     }
   }
-  else if (currentPage == 2) { // PREVISIONS
+  else if (currentPage == 2) {
       const char* labels[3] = {"Demain", "J + 2", "J + 3"};
       for(int i=0; i<3; i++) {
           int y = 80 + (i*50); 
@@ -459,12 +480,7 @@ void refreshDisplayData() {
           tft.setTextColor(C_RED, C_BLACK); tft.setCursor(200, y); tft.printf("%.0f", apiWeather.forecastMax[i]);
       }
   }
-  else if (currentPage == 3) { // ALERTES (Conditionnel)
-    tft.setTextSize(2); tft.setCursor(10, 80);
-    if(alertActive) { tft.setTextColor(C_RED, C_BLACK); tft.println("! ATTENTION !"); tft.setTextSize(1); tft.println(alertMessage); } 
-    else { tft.setTextColor(C_GREEN, C_BLACK); tft.println("AUCUNE ALERTE"); }
-  }
-  else if (currentPage == 4) { // GPS
+  else if (currentPage == 3) { // GPS
     if(!currentGPS.isValid) { tft.setTextSize(1); tft.setTextColor(C_ORANGE, C_BLACK); tft.setCursor(130, 55); tft.print("SIMULATION"); } else { tft.fillRect(130, 55, 100, 10, C_BLACK); }
     tft.setTextColor(C_WHITE, C_BLACK); tft.setTextSize(2);
     tft.setCursor(10, 95); tft.printf("%.4f", currentGPS.lat); tft.setCursor(120, 95); tft.printf("%.4f", currentGPS.lon);
@@ -472,11 +488,31 @@ void refreshDisplayData() {
     tft.setCursor(10, 195); tft.printf("%d  ", currentGPS.sats); tft.setCursor(120, 195); tft.printf("%.0f  ", currentGPS.course);
     tft.setTextSize(1); tft.setCursor(60, 220); tft.setTextColor(C_GREY, C_BLACK); tft.print("UTC: " + currentGPS.date + " " + currentGPS.time);
   }
-  else if (currentPage == 5) { // RESEAU
+  else if (currentPage == 4) { // RESEAU
     tft.setTextSize(1);
     tft.setCursor(10, 80); tft.print("IP: "); tft.println(WiFi.localIP());
     tft.setCursor(10, 100); tft.print("SSID: "); tft.println(WiFi.SSID());
     tft.setCursor(10, 120); tft.print("RSSI: "); tft.print(WiFi.RSSI()); tft.println(" dBm");
     tft.setCursor(10, 140); tft.print("MAC: "); tft.println(WiFi.macAddress());
+  }
+  else if (currentPage == 5) { // ETAT SYSTEME (Exhaustif)
+      tft.fillRect(10, 75, 120, 35, C_BLACK); 
+      if(alertActive) {
+          tft.setCursor(10, 80); tft.setTextColor(C_RED); tft.setTextSize(2); tft.print("ALERTE !");
+          tft.setCursor(10, 100); tft.setTextSize(1); tft.print(alertMessage);
+          tft.fillCircle(200, 90, 25, C_RED); tft.setTextColor(C_WHITE); tft.setCursor(194, 83); tft.setTextSize(2); tft.print("!");
+      } else {
+          tft.setCursor(10, 80); tft.setTextColor(C_GREEN); tft.setTextSize(2); tft.print("NOMINAL");
+          tft.setCursor(10, 100); tft.setTextSize(1); tft.setTextColor(C_GREY); tft.print("Aucune alerte");
+          tft.fillCircle(200, 90, 25, C_GREEN); tft.setTextColor(C_BLACK); tft.setCursor(188, 83); tft.setTextSize(2); tft.print("OK");
+      }
+
+      tft.setTextColor(C_WHITE, C_BLACK); tft.setTextSize(1);
+      tft.setCursor(10, 130); tft.print("Uptime: "); tft.print(getUptime());
+      tft.setCursor(10, 145); tft.print("RAM: "); tft.print(ESP.getFreeHeap() / 1024); tft.print(" KB libre");
+      tft.setCursor(10, 160); tft.print("CPU: "); tft.print(ESP.getCpuFreqMHz()); tft.print(" MHz");
+      
+      tft.setCursor(10, 190); tft.print("WiFi: "); tft.print(WiFi.SSID());
+      tft.setCursor(10, 205); tft.print("Signal: "); tft.print(WiFi.RSSI()); tft.print(" dBm");
   }
 }

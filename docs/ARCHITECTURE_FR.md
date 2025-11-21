@@ -1,51 +1,32 @@
-#### `ARCHITECTURE.md` (English)
-```markdown
-# System Architecture
+# Architecture du Projet
 
-## Overview
-The system operates on a non-blocking loop architecture to ensure responsiveness across all interfaces (Display, Web, Telegram).
+Ce document donne un aperçu de l'architecture logicielle de la station météo.
 
-## Core Components
+## Concepts Clés
 
-1.  **Non-Blocking Loop:**
-    * Uses `millis()` timers for periodic tasks (Sensors reading, Weather fetching, Display refresh).
-    * GPS serial data is processed continuously.
+### Boucle Principale & Machine à États
+Le système est construit autour d'une boucle principale non-bloquante (`loop()`). Une machine à états gère la page actuellement affichée à l'écran. Les entrées utilisateur (appui sur les boutons) déclenchent des transitions d'état pour naviguer entre les pages.
 
-2.  **Interrupts (ISR):**
-    * Button presses (`PAGE` and `ACTION`) trigger Interrupt Service Routines.
-    * This sets flags that are handled in the main loop immediately, preventing UI lag.
+### Gestion des Entrées
+- **Boutons sur Interruptions :** Les boutons sont gérés via des interruptions (ISR) pour une réactivité instantanée sans bloquer la boucle principale. [1]
+- **Anti-Rebond Logiciel :** Une période réfractaire de 300ms est implémentée dans la boucle principale pour éviter que les rebonds mécaniques ou les parasites ne provoquent des sauts de page multiples sur un seul appui. [2]
 
-3.  **Networking:**
-    * **WiFiMulti:** Connects to the best available network from the list.
-    * **AsyncWebServer:** Handles HTTP requests asynchronously without blocking the sensor loop.
+### Réseau & APIs
+- **API Open-Meteo :** Utilisée pour récupérer la météo actuelle, les prévisions journalières et la pression au niveau de la mer (QNH) pour le calibrage de l'altitude.
+- **Timeout sur Requêtes HTTP :** Toutes les requêtes vers l'API météo ont un **timeout de 3000ms** pour empêcher l'appareil de se figer si le réseau est lent ou si le serveur ne répond pas. [3]
+- **Serveur Web Local :** Un `ESPAsyncWebServer` fournit une interface web et une API JSON.
+- **API JSON (`/api/data`) :** Expose les données des capteurs et les diagnostics système en temps réel.
+- **Bot Telegram :** Permet le contrôle à distance et la consultation de l'état.
 
-4.  **Data Flow:**
-    * `GPS` -> Updates Coordinates -> Triggers `Open-Meteo API`.
-    * `Open-Meteo` -> Provides QNH (Pressure at Sea Level) -> Calibrates `BMP280` Altitude.
-    * `AHT20/BMP280` -> Updates Local Data -> Updates `Display` & `Web JSON`.
-ARCHITECTURE_FR.md (Français)
-Markdown
+### Moteur Graphique
+- **"Flat Design" Procédural :** Les icônes météo sont dessinées de manière procédurale (vectorielle) plutôt qu'en utilisant des fichiers bitmaps statiques. Le résultat est un affichage net, adaptable et qui réduit l'espace de stockage nécessaire. [4]
+- **Bibliothèques GFX :** Les bibliothèques Adafruit GFX et ST7789 constituent la base du pilote d'affichage.
 
-# Architecture Système
+### Stabilité & Diagnostics
+- **Audio Non-Bloquant :** La fonction `beep()` utilise une logique PWM non-bloquante, garantissant que les notifications sonores ne stoppent pas les autres processus. [5]
+- **Page Système :** Une page dédiée (Page 5) affiche des diagnostics système critiques : Uptime (temps de fonctionnement), Mémoire Heap libre, Fréquence CPU et RSSI WiFi. [6]
+- **Alertes Intelligentes :** La page d'alertes est toujours accessible mais s'affiche aussi automatiquement et immédiatement si une alerte critique est déclenchée. [7]
 
-## Vue d'ensemble
-Le système fonctionne sur une architecture de boucle non-bloquante pour assurer la réactivité sur toutes les interfaces (Écran, Web, Telegram).
-
-## Composants Clés
-
-1.  **Boucle Non-Bloquante :**
-    * Utilise des timers `millis()` pour les tâches périodiques (Lecture capteurs, Météo, Rafraîchissement écran).
-    * Les données série du GPS sont traitées en continu.
-
-2.  **Interruptions (ISR) :**
-    * Les appuis boutons (`PAGE` et `ACTION`) déclenchent des routines d'interruption.
-    * Cela active des drapeaux (flags) traités immédiatement dans la boucle principale, évitant le lag de l'interface.
-
-3.  **Réseau :**
-    * **WiFiMulti :** Se connecte au meilleur réseau disponible dans la liste.
-    * **AsyncWebServer :** Gère les requêtes HTTP de manière asynchrone sans bloquer la boucle des capteurs.
-
-4.  **Flux de Données :**
-    * `GPS` -> Met à jour Coordonnées -> Déclenche `API Open-Meteo`.
-    * `Open-Meteo` -> Fournit QNH (Pression niveau mer) -> Calibre l'altitude `BMP280`.
-    * `AHT20/BMP280` -> Met à jour Données Locales -> Met à jour `Écran` & `Web JSON`.
+### Gestion des Capteurs
+- **Calibration Dynamique de l'Altitude :** L'altitude barométrique est calibrée dynamiquement en utilisant la pression au niveau de la mer (QNH) fournie par l'API Open-Meteo pour une meilleure précision. [8]
+- **Découverte I2C :** Le code vérifie automatiquement la présence du capteur BMP280 aux deux adresses I2C communes (0x76 et 0x77). [1]

@@ -1,58 +1,31 @@
-
-### 2. `API_REFERENCE_FR.md` (Français)
-
-```markdown
 # Référence API
 
-La Station Météo ESP32-S3 expose un serveur Web local fournissant les données en temps réel au format JSON.
+## API JSON Locale
 
-## URL de base
-`http://<ADRESSE_IP_DE_L_ESP32>`
+L'appareil héberge un serveur web qui expose un point de terminaison d'API JSON pour les données en temps réel.
 
----
+**Point de terminaison :** `GET /api/data`
 
-## Points d'accès HTTP (Endpoints)
+### Corps de la Réponse
 
-### `GET /api/data`
-Renvoie toutes les mesures des capteurs, les données météo locales, le statut GPS et les alertes système dans un objet JSON unique.
-
-**Structure de la réponse :**
+L'objet JSON contient les lectures des capteurs et l'état du système.
 
 ```json
 {
-  "sensor": {
-    "temp": 22.5,      // Température Intérieure (C)
-    "hum": 45,         // Humidité Intérieure (%)
-    "pres": 1013.2,    // Pression (hPa) - Optionnel selon init capteur
-    "lux": 1200        // Niveau de luminosité (0-4095)
-  },
-  "weather": {
-    "temp": 21.0,      // Température Extérieure via API (C)
-    "code": 1          // Code Météo WMO (0=Clair, 1-3=Nuageux, etc.)
-  },
-  "gps": {
-    "lat": 44.8378,    // Latitude
-    "lon": -0.5792,    // Longitude
-    "valid": true      // true si Fix GPS réel, false si simulation/défaut
-  },
-  "alert": false       // true si une alerte de température est active
+  "temperature": 23.5,
+  "humidity": 45.8,
+  "pressure": 1013.25,
+  "altitude": 150.5,
+  "gps_lat": 48.8584,
+  "gps_lon": 2.2945,
+  "gps_sats": 8,
+  "uptime": "1j 02:30:45",
+  "free_heap": 123456,
+  "cpu_freq": 240,
+  "wifi_rssi": -55
 }
-````
-
-**Codes de statut :**
-
-  * `200 OK`: Requête réussie.
-
------
-
-## Commandes Bot Telegram
-
-Vous pouvez interagir avec la station via le Chat ID Telegram configuré dans `secrets.h`.
-
-| Commande | Description |
-| :--- | :--- |
-| `/start` | Vérifie la connexion et renvoie la version actuelle du firmware. |
-| `/status` | Renvoie un résumé texte immédiat des capteurs internes et de la météo externe. |
-| `/reboot` | Redémarre le module ESP32 à distance. |
-
 ```
+
+## APIs Externes
+
+- **Open-Meteo :** Utilisée pour récupérer les données de prévisions météo. La requête inclut désormais le paramètre `daily` pour obtenir les prévisions sur 3 jours.
