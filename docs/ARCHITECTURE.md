@@ -1,25 +1,32 @@
-#### `ARCHITECTURE.md` (English)
-```markdown
-# System Architecture
+# Project Architecture
 
-## Overview
-The system operates on a non-blocking loop architecture to ensure responsiveness across all interfaces (Display, Web, Telegram).
+This document provides an overview of the software architecture of the Meteo Station.
 
-## Core Components
+## Core Concepts
 
-1.  **Non-Blocking Loop:**
-    * Uses `millis()` timers for periodic tasks (Sensors reading, Weather fetching, Display refresh).
-    * GPS serial data is processed continuously.
+### Main Loop & State Machine
+The system is built around a non-blocking main loop (`loop()`). A state machine manages the current page displayed on the screen. User inputs (button presses) trigger state transitions to navigate between pages.
 
-2.  **Interrupts (ISR):**
-    * Button presses (`PAGE` and `ACTION`) trigger Interrupt Service Routines.
-    * This sets flags that are handled in the main loop immediately, preventing UI lag.
+### Input Management
+- **Interrupt-Based Buttons:** Buttons are handled via interrupts (ISR) for immediate responsiveness without blocking the main loop.
+- **Software Debounce:** A 300ms refractory period is implemented in the main loop to prevent mechanical bounces or noise from causing multiple page jumps on a single press.
 
-3.  **Networking:**
-    * **WiFiMulti:** Connects to the best available network from the list.
-    * **AsyncWebServer:** Handles HTTP requests asynchronously without blocking the sensor loop.
+### Network & APIs
+- **Open-Meteo API:** Used to fetch current weather, daily forecasts, and sea-level pressure (QNH) for altitude calibration.
+- **HTTP Request Timeout:** All weather API requests have a **3000ms timeout** to prevent the device from freezing if the network is slow or the server is unresponsive.
+- **Local Web Server:** An `ESPAsyncWebServer` provides a web interface and a JSON API.
+- **JSON API (`/api/data`):** Exposes real-time sensor data and system diagnostics.
+- **Telegram Bot:** Allows for remote control and status checks.
 
-4.  **Data Flow:**
-    * `GPS` -> Updates Coordinates -> Triggers `Open-Meteo API`.
-    * `Open-Meteo` -> Provides QNH (Pressure at Sea Level) -> Calibrates `BMP280` Altitude.
-    * `AHT20/BMP280` -> Updates Local Data -> Updates `Display` & `Web JSON`.
+### Graphics Engine
+- **Procedural "Flat Design":** Weather icons are drawn procedurally (vector-based) rather than using static bitmap files. This results in crisp, scalable graphics and reduces storage needs.
+- **GFX Libraries:** The Adafruit GFX and ST7789 libraries form the basis of the display driver.
+
+### System Stability & Diagnostics
+- **Non-Blocking Audio:** The `beep()` function uses non-blocking PWM logic, ensuring that sound notifications do not halt other processes.
+- **System Page:** A dedicated page (Page 5) displays critical system diagnostics: Uptime, Free Heap Memory, CPU Frequency, and WiFi RSSI.
+- **Smart Alerts:** The alert page is always accessible but will also pop up automatically and immediately if a critical alert is triggered.
+
+### Sensor Management
+- **Dynamic Altitude Calibration:** Barometric altitude is dynamically calibrated using the Sea Level Pressure (QNH) provided by the Open-Meteo API for improved accuracy.
+- **I2C Discovery:** The code automatically checks for the BMP280 sensor at both common I2C addresses (0x76 and 0x77).

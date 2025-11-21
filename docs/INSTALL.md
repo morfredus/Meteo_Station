@@ -1,33 +1,27 @@
-# Installation & Wiring Guide
+# Installation Guide
 
-## Prerequisites
-* **Software:** Visual Studio Code + PlatformIO Extension.
-* **Drivers:** USB Drivers for ESP32-S3 (CH340 or CP210x depending on board).
+This document describes how to set up the project environment.
 
-## Wiring Diagram (Pinout)
+## Hardware Dependencies
 
-| Component | Pin Name | ESP32-S3 GPIO | Notes |
-| :--- | :--- | :--- | :--- |
-| **I2C Sensors** | SDA | 21 | AHT20 & BMP280 shared |
-| | SCL | 20 | |
-| **TFT Display** | MOSI/SDA | 11 | SPI Data |
-| | SCLK/SCL | 12 | SPI Clock |
-| | CS | 10 | Chip Select |
-| | DC | 6 | Data/Command |
-| | RST | 7 | Reset |
-| | BL | 15 | Backlight |
-| **GPS (GT-U7)** | TX | 8 | Connect GPS TX to ESP RX pin |
-| | RX | 5 | Connect GPS RX to ESP TX pin |
-| **Buttons** | Page Btn | 1 | Pull-up Internal |
-| | Action Btn | 2 | Pull-up Internal |
-| **Misc** | Buzzer | 3 | |
-| | LDR (Light) | 9 | Analog Input |
-| | NeoPixel | 48 | On-board RGB LED |
+- ESP32-S3 (e.g., ESP32-S3-DevKitC-1)
+- ST7789 Display
+- AHT20 Sensor (Temperature, Humidity)
+- BMP280 Sensor (Pressure)
+- GPS Module (e.g., Neo-6M)
+- Buttons for user input
+- Passive Buzzer
 
-## Libraries
-Dependencies are automatically managed via `platformio.ini`. Major libs used:
-* `Adafruit GFX` & `ST7789`
-* `ArduinoJson` (v7)
-* `UniversalTelegramBot`
-* `TinyGPSPlus`
-* `ESPAsyncWebServer`
+## Software Dependencies
+
+This project is built using PlatformIO. The required libraries are automatically managed if you use the provided `platformio.ini` file.
+
+Key libraries include:
+- `bblanchon/ArduinoJson @ ^7.0.4`
+- `esphome/ESPAsyncWebServer-esphome @ ^3.1.0`
+- `adafruit/Adafruit GFX Library @ ^1.11.9`
+- `adafruit/Adafruit ST7735 and ST7789 Library @ ^1.10.3`
+- `adafruit/Adafruit AHTX0 @ ^2.0.5`
+- `adafruit/Adafruit BMP280 Library @ ^2.6.8`
+- `mikalhart/TinyGPSPlus @ ^1.1.0`
+- `witnessmenow/UniversalTelegramBot @ ^1.3.0`

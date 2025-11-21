@@ -1,10 +1,13 @@
-# FAQ
+# Foire Aux Questions (FAQ)
 
-**Q: Mon altitude indique -110m, pourquoi ?**
-R: Cela arrive si le BMP280 utilise une pression standard statique (1013.25 hPa) alors que la pression réelle est haute (anticyclone). **Mettez à jour en v1.1.5+** : Nous utilisons maintenant une calibration dynamique via l'API Météo pour corriger cela.
+**Q : L'interface se bloque parfois pendant la mise à jour de la météo. Pourquoi ?**
 
-**Q: Le GPS indique "NO FIX" ou "SIMULATION".**
-R: Les modules GPS comme le GT-U7 nécessitent une vue dégagée du ciel. En intérieur, ils échouent souvent à capter les satellites. Le système utilise les coordonnées de Bordeaux par défaut tant que le signal n'est pas trouvé.
+**R :** C'était un problème connu dans les anciennes versions, surtout avec une connexion WiFi instable. Il a été corrigé dans la **version 1.7.0** par l'ajout d'un timeout réseau. Veuillez mettre à jour votre firmware. Si le problème persiste, vérifiez la stabilité de votre réseau.
 
-**Q: Les boutons ne répondent pas instantanément.**
-R: Assurez-vous d'utiliser la version **v1.1.1** ou supérieure, qui a implémenté les Interruptions (ISR) pour la gestion des boutons.
+**Q : J'appuie une fois sur un bouton, mais l'écran saute deux pages. Comment puis-je corriger cela ?**
+
+**R :** Ce comportement était causé par le rebond mécanique des boutons. Il a été corrigé dans la **version 1.6.0** en introduisant un mécanisme "d'anti-rebond" logiciel. Assurez-vous que votre appareil est à jour.
+
+**Q : Pourquoi la page "Alertes" est-elle maintenant toujours visible dans le cycle de navigation ?**
+
+**R :** Depuis la **version 1.5.0**, la page est toujours accessible pour permettre de vérifier l'état du système à tout moment. Elle affiche un bouclier vert et "Système Nominal" quand tout va bien, et bascule vers l'écran d'alerte critique si nécessaire.

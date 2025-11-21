@@ -3,7 +3,7 @@
 
 #include "secrets.h"
 
-#define PROJECT_NAME "Meteo Station S3"
+#define PROJECT_NAME "Meteo Station ESP32-S3"
 
 // ================= PINS I2C (SDA/SCL) =================
 // Adapter selon le cablage réel sur le DevKitC-1
