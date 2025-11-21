@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.8.1] - 2025-11-22
+### Corrections & Améliorations
+- **Provider Météo :** Affichage du nom complet du fournisseur de données ("OpenWeatherMap" ou "Open-Meteo") sur la page Système et Réseau.
+- **Qualité de l'Air (AQI) :**
+    - La requête AQI est désormais **découplée** de la requête météo principale.
+    - Le système tente de récupérer l'AQI via OpenWeatherMap (clé API) même si le fournisseur météo a basculé sur Open-Meteo (mode Hybride).
+    - Cela résout le problème où l'AQI restait à "N/A" en cas de bascule sur le secours.
+  
 ## [1.8.0] - 2025-11-22
 ### Architecture de Données (Data Provider)
 - **OpenWeatherMap (OWM) :** Devient le fournisseur météo principal.
