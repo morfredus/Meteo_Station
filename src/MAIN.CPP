@@ -17,7 +17,6 @@
 
 #include "config.h"
 #include "web_page.h"
-#include "weather_graphics.h" // <--- NOUVEAU FICHIER
 
 // ================= OBJETS GLOBAUX =================
 WiFiMulti wifiMulti;
@@ -43,13 +42,15 @@ struct WeatherData {
   float temp = 0.0;
   int weatherCode = 0;
   float pressureMSL = 1013.25;
+  
+  // Tableaux pour les prévisions (J+1, J+2, J+3)
   float forecastMax[3] = {0,0,0};
   float forecastMin[3] = {0,0,0};
   int forecastCode[3] = {0,0,0};
 } apiWeather;
 
 struct GPSData {
-  double lat = 44.8378;
+  double lat = 44.8378; // Bordeaux
   double lon = -0.5792; 
   double alt = 0.0;
   double speed = 0.0;
@@ -62,17 +63,17 @@ struct GPSData {
 
 bool alertActive = false;
 String alertMessage = "Aucune alerte";
-bool gpsFixNotified = false;
 
 int currentPage = 0;
-const int TOTAL_PAGES = 6;
+const int TOTAL_PAGES = 6; // Ajout Page 5 (Prévisions)
 
+// Timers
 unsigned long lastTimeSensor = 0;
 unsigned long lastTimeWeather = 0;
 unsigned long lastTimeTelegram = 0;
 unsigned long lastDisplayUpdate = 0;
 
-// ================= INTERRUPTIONS =================
+// ================= INTERRUPTIONS (BOUTONS) =================
 volatile bool flagPagePressed = false;
 volatile bool flagActionPressed = false;
 unsigned long lastDebounceTime = 0;
@@ -97,10 +98,10 @@ void fetchWeather();
 void handleTelegram();
 void refreshDisplayData();
 void drawFullPage();
-void beep(int count, int duration);
+void playAlertTone();
 void setNeoPixelStatus();
 void handleButtonLogic();
-// Plus besoin de getWeatherIcon() -> géré par weather_graphics.h
+uint16_t getWeatherColor(int code); // Helper couleur
 
 // ================= SETUP =================
 void setup() {
@@ -113,12 +114,6 @@ void setup() {
   attachInterrupt(digitalPinToInterrupt(PIN_BUTTON_ACTION), isrActionBtn, FALLING);
 
   pinMode(PIN_BUZZER, OUTPUT);
-  #ifndef BUZZER_LEDC_CHANNEL
-    #define BUZZER_LEDC_CHANNEL 0
-  #endif
-  ledcSetup(BUZZER_LEDC_CHANNEL, 2000, 8);
-  ledcAttachPin(PIN_BUZZER, BUZZER_LEDC_CHANNEL);
-
   pinMode(PIN_LIGHT_SENSOR, INPUT);
   pinMode(TFT_BL, OUTPUT);
   digitalWrite(TFT_BL, HIGH);
@@ -145,6 +140,7 @@ void setup() {
     request->send_P(200, "text/html", index_html);
   });
   
+  // API Update pour inclure les previsions web (optionnel, ici basique)
   server.on("/api/data", HTTP_GET, [](AsyncWebServerRequest *request){
     JsonDocument doc;
     doc["sensor"]["temp"] = localSensor.temp;
@@ -154,6 +150,7 @@ void setup() {
     doc["gps"]["lat"] = currentGPS.lat;
     doc["gps"]["lon"] = currentGPS.lon;
     doc["gps"]["valid"] = currentGPS.isValid;
+    // On pourrait ajouter les previsions ici aussi
     String response; serializeJson(doc, response);
     request->send(200, "application/json", response);
   });
@@ -181,10 +178,6 @@ void loop() {
     currentGPS.sats = gps.satellites.value();
     currentGPS.isValid = true;
     
-    if (!gpsFixNotified && currentGPS.isValid) {
-        beep(3, 80); 
-        gpsFixNotified = true;
-    }
     char buffDate[12]; sprintf(buffDate, "%02d/%02d/%02d", gps.date.day(), gps.date.month(), gps.date.year());
     currentGPS.date = String(buffDate);
     char buffTime[10]; sprintf(buffTime, "%02d:%02d:%02d", gps.time.hour(), gps.time.minute(), gps.time.second());
@@ -217,27 +210,39 @@ void loop() {
   }
 }
 
-// ================= LOGIQUE =================
+// ================= LOGIQUE METIER =================
 
 void handleButtonLogic() {
   if (flagPagePressed) {
-    beep(1, 50);
     flagPagePressed = false;
     currentPage++;
     if (currentPage >= TOTAL_PAGES) currentPage = 0;
     drawFullPage(); refreshDisplayData();
   }
   if (flagActionPressed) {
-    beep(1, 50);
     flagActionPressed = false;
+    playAlertTone();
     tft.setCursor(220, 5); tft.setTextColor(C_YELLOW, C_BLUE); tft.print("*");
     fetchWeather(); refreshDisplayData();
   }
 }
 
+// Helper couleur WMO
+uint16_t getWeatherColor(int code) {
+    if (code <= 1) return C_YELLOW; // Soleil
+    if (code <= 3) return C_GREY;   // Nuage
+    if (code <= 48) return C_GREY;  // Brouillard
+    if (code <= 67) return C_BLUE;  // Pluie
+    if (code <= 77) return C_WHITE; // Neige
+    if (code <= 82) return C_BLUE;  // Averses
+    if (code <= 99) return C_RED;   // Orage
+    return C_GREY;
+}
+
 void fetchWeather() {
   if (wifiMulti.run() != WL_CONNECTED) return;
   HTTPClient http;
+  // Ajout daily=weather_code,temperature_2m_max,temperature_2m_min
   String url = String("http://api.open-meteo.com/v1/forecast?latitude=") + 
                String(currentGPS.lat, 4) + "&longitude=" + String(currentGPS.lon, 4) + 
                "&current=temperature_2m,weather_code,pressure_msl&daily=weather_code,temperature_2m_max,temperature_2m_min&timezone=auto";
@@ -248,11 +253,14 @@ void fetchWeather() {
     JsonDocument doc;
     DeserializationError error = deserializeJson(doc, payload);
     if (!error) {
+      // Actuel
       apiWeather.temp = doc["current"]["temperature_2m"];
       apiWeather.weatherCode = doc["current"]["weather_code"];
       float pMSL = doc["current"]["pressure_msl"];
       if(pMSL > 800 && pMSL < 1200) apiWeather.pressureMSL = pMSL;
 
+      // Prévisions (Tableaux JSON)
+      // Index 0 = Aujourd'hui, Index 1 = Demain, etc.
       for(int i=0; i<3; i++) {
           apiWeather.forecastCode[i] = doc["daily"]["weather_code"][i+1];
           apiWeather.forecastMax[i] = doc["daily"]["temperature_2m_max"][i+1];
@@ -263,23 +271,15 @@ void fetchWeather() {
   http.end();
 }
 
-void beep(int count, int duration) {
-    for (int i = 0; i < count; i++) {
-        ledcWriteTone(BUZZER_LEDC_CHANNEL, 2000);
-        delay(duration);
-        ledcWriteTone(BUZZER_LEDC_CHANNEL, 0);
-        if (i < count - 1) delay(duration);
-    }
-}
-
 void handleTelegram() {
   int numNewMessages = bot.getUpdates(bot.last_message_received + 1);
   while (numNewMessages) {
     for (int i = 0; i < numNewMessages; i++) {
-      if (String(bot.messages[i].chat_id) != TELEGRAM_CHAT_ID) continue;
+      String chat_id = String(bot.messages[i].chat_id);
+      if (chat_id != TELEGRAM_CHAT_ID) continue;
       String text = bot.messages[i].text;
-      if (text == "/start") bot.sendMessage(bot.messages[i].chat_id, "Station v" + String(PROJECT_VERSION), "");
-      else if (text == "/status") bot.sendMessage(bot.messages[i].chat_id, "Temp: " + String(localSensor.temp) + "C", "");
+      if (text == "/start") bot.sendMessage(chat_id, "Station v" + String(PROJECT_VERSION), "");
+      else if (text == "/status") bot.sendMessage(chat_id, "Temp: " + String(localSensor.temp) + "C", "");
       else if (text == "/reboot") ESP.restart();
     }
     numNewMessages = bot.getUpdates(bot.last_message_received + 1);
@@ -288,10 +288,15 @@ void handleTelegram() {
 
 void drawStartupScreen() {
   tft.fillScreen(C_BLACK);
-  // On utilise aussi notre moteur graphique pour le boot !
-  drawSun(tft, 120, 80); 
-  
-  tft.setTextSize(2); tft.setTextColor(C_WHITE);
+  tft.fillCircle(120, 80, 40, C_YELLOW); 
+  tft.fillCircle(120, 80, 34, C_ORANGE); 
+  tft.fillCircle(120, 80, 28, C_YELLOW);
+  tft.fillCircle(100, 100, 20, C_WHITE);
+  tft.fillCircle(130, 105, 18, C_WHITE);
+  tft.fillCircle(150, 100, 15, C_WHITE);
+  tft.fillRect(100, 100, 50, 20, C_WHITE);
+
+  tft.setTextColor(C_WHITE); tft.setTextSize(2);
   tft.setCursor(40, 140); tft.print("METEO STATION");
   tft.setTextSize(1); tft.setTextColor(C_GREY);
   tft.setCursor(90, 165); tft.print("v"); tft.print(PROJECT_VERSION);
@@ -311,20 +316,25 @@ void drawStartupScreen() {
     delay(100);
   }
   tft.fillRect(42, 202, 156, 6, C_GREEN);
-  beep(2, 100);
   tft.setCursor(40, 215); tft.setTextColor(C_GREEN); tft.print("Succes: " + WiFi.SSID());
   delay(1500);
 }
 
 void initSensors() {
     if(!aht.begin()) Serial.println("AHT20 ERROR");
-    if (!bmp.begin(0x76) && !bmp.begin(0x77)) localSensor.pres = NAN;
-    else bmp.setSampling(Adafruit_BMP280::MODE_NORMAL, Adafruit_BMP280::SAMPLING_X2, Adafruit_BMP280::SAMPLING_X16, Adafruit_BMP280::FILTER_X16, Adafruit_BMP280::STANDBY_MS_500);
+    bool bmp_ok = bmp.begin(0x76);
+    if (!bmp_ok) bmp_ok = bmp.begin(0x77);
+    if (!bmp_ok) localSensor.pres = NAN;
+    else {
+        bmp.setSampling(Adafruit_BMP280::MODE_NORMAL, Adafruit_BMP280::SAMPLING_X2, Adafruit_BMP280::SAMPLING_X16, Adafruit_BMP280::FILTER_X16, Adafruit_BMP280::STANDBY_MS_500);
+    }
 }
 
 void updateSensors() {
-  sensors_event_t h, t; aht.getEvent(&h, &t);
-  localSensor.temp = t.temperature; localSensor.hum = h.relative_humidity;
+  sensors_event_t humidity, temp;
+  aht.getEvent(&humidity, &temp);
+  localSensor.temp = temp.temperature;
+  localSensor.hum = humidity.relative_humidity;
   float p = bmp.readPressure();
   if (!isnan(p) && p > 0) localSensor.pres = p / 100.0F;
   localSensor.lux = analogRead(PIN_LIGHT_SENSOR);
@@ -341,12 +351,24 @@ void setNeoPixelStatus() {
   pixels.show();
 }
 
+void playAlertTone() {
+  #ifndef BUZZER_LEDC_CHANNEL
+    #define BUZZER_LEDC_CHANNEL 0
+  #endif
+  ledcSetup(BUZZER_LEDC_CHANNEL, 2000, 8);
+  ledcAttachPin(PIN_BUZZER, BUZZER_LEDC_CHANNEL);
+  ledcWriteTone(BUZZER_LEDC_CHANNEL, 2000); delay(100);
+  ledcWriteTone(BUZZER_LEDC_CHANNEL, 0); ledcDetachPin(PIN_BUZZER);
+}
+
 // ================= AFFICHAGE =================
 void drawFullPage() {
   tft.fillScreen(C_BLACK); 
-  tft.fillRect(0, 0, TFT_WIDTH, 35, C_BLUE); 
+  tft.fillRect(0, 0, TFT_WIDTH, 35, C_BLUE); // Header
+  
   tft.setTextColor(C_GREY); tft.setTextSize(1);
   tft.setCursor(5, 225); tft.printf("Page %d/%d", currentPage + 1, TOTAL_PAGES);
+
   tft.setTextColor(C_WHITE); tft.setTextSize(2);
 
   if (currentPage == 0) { // RESUME
@@ -356,23 +378,34 @@ void drawFullPage() {
     tft.drawLine(10, 150, 230, 150, C_GREY);
   }
   else if (currentPage == 1) { // DETAILS
-    tft.setCursor(10, 45); tft.print("ENVIRONNEMENT"); tft.drawLine(10, 65, 230, 65, C_GREY);
+    tft.setCursor(10, 45); tft.print("ENVIRONNEMENT");
+    tft.drawLine(10, 65, 230, 65, C_GREY);
     tft.setTextSize(1); tft.setTextColor(C_GREY);
     tft.setCursor(10, 80); tft.print("HUMIDITE"); tft.setCursor(120, 80); tft.print("PRESSION");
     tft.setCursor(10, 140); tft.print("LUMINOSITE"); tft.setCursor(120, 140); tft.print("ALTITUDE");
   }
   else if (currentPage == 2) { // ALERTES
-    tft.setCursor(10, 45); tft.print("ETAT ALERTES"); tft.drawLine(10, 65, 230, 65, C_GREY);
+    tft.setCursor(10, 45); tft.print("ETAT ALERTES");
+    tft.drawLine(10, 65, 230, 65, C_GREY);
   }
   else if (currentPage == 3) { // GPS
-    tft.setCursor(10, 45); tft.print("DONNEES GPS"); tft.drawLine(10, 65, 230, 65, C_GREY);
+    tft.setCursor(10, 45); tft.print("DONNEES GPS");
+    tft.drawLine(10, 65, 230, 65, C_GREY);
+    tft.setTextSize(1); tft.setTextColor(C_GREY);
+    tft.setCursor(10, 80); tft.print("LATITUDE"); tft.setCursor(120, 80); tft.print("LONGITUDE");
+    tft.setCursor(10, 130); tft.print("ALTITUDE"); tft.setCursor(120, 130); tft.print("VITESSE");
+    tft.setCursor(10, 180); tft.print("SATELLITES"); tft.setCursor(120, 180); tft.print("CAP");
   }
   else if (currentPage == 4) { // RESEAU
-     tft.setCursor(10, 45); tft.print("RESEAU & SYS"); tft.drawLine(10, 65, 230, 65, C_GREY);
+     tft.setCursor(10, 45); tft.print("RESEAU & SYS");
+     tft.drawLine(10, 65, 230, 65, C_GREY);
   }
-  else if (currentPage == 5) { // PREVISIONS
-     tft.setCursor(10, 45); tft.print("PREVISIONS (3J)"); tft.drawLine(10, 65, 230, 65, C_GREY);
-     tft.drawLine(10, 115, 230, 115, 0x2104);
+  else if (currentPage == 5) { // PREVISIONS (NEW)
+     tft.setCursor(10, 45); tft.print("PREVISIONS (3J)");
+     tft.drawLine(10, 65, 230, 65, C_GREY);
+     
+     // Dessin des séparateurs de ligne
+     tft.drawLine(10, 115, 230, 115, 0x2104); // Gris très foncé
      tft.drawLine(10, 165, 230, 165, 0x2104);
   }
 }
@@ -395,17 +428,15 @@ void refreshDisplayData() {
     tft.printf("%02d:%02d", timeinfo.tm_hour, timeinfo.tm_min);
   }
 
+  // Pages
   tft.setTextColor(C_WHITE, C_BLACK);
 
   if (currentPage == 0) {
     tft.setTextSize(3);
     tft.setCursor(10, 80); tft.printf("%.1f C  ", localSensor.temp);
     tft.setCursor(10, 160); tft.printf("%.1f C  ", apiWeather.temp);
-    
-    // === ICONE METEO DESSINÉE ===
-    // On efface d'abord la zone (pour éviter les traces des anciens dessins)
-    tft.fillRect(180, 140, 50, 50, C_BLACK); 
-    drawWeatherByCode(tft, 200, 165, apiWeather.weatherCode);
+    // Utilisation Helper
+    tft.fillCircle(200, 175, 20, getWeatherColor(apiWeather.weatherCode));
   }
   else if (currentPage == 1) {
     tft.setTextSize(2);
@@ -425,8 +456,11 @@ void refreshDisplayData() {
     else { tft.setTextColor(C_GREEN, C_BLACK); tft.println("AUCUNE ALERTE"); }
   }
   else if (currentPage == 3) {
-    if(!currentGPS.isValid) { tft.setTextSize(1); tft.setTextColor(C_ORANGE, C_BLACK); tft.setCursor(130, 55); tft.print("SIMULATION"); } else { tft.fillRect(130, 55, 100, 10, C_BLACK); }
-    tft.setTextColor(C_WHITE, C_BLACK); tft.setTextSize(2);
+    if(!currentGPS.isValid) {
+        tft.setTextSize(1); tft.setTextColor(C_ORANGE, C_BLACK); tft.setCursor(130, 55); tft.print("SIMULATION");
+    } else { tft.fillRect(130, 55, 100, 10, C_BLACK); }
+    tft.setTextColor(C_WHITE, C_BLACK);
+    tft.setTextSize(2);
     tft.setCursor(10, 95); tft.printf("%.4f", currentGPS.lat); tft.setCursor(120, 95); tft.printf("%.4f", currentGPS.lon);
     tft.setCursor(10, 145); tft.printf("%.0f m ", currentGPS.alt); tft.setCursor(120, 145); tft.printf("%.1f km", currentGPS.speed);
     tft.setCursor(10, 195); tft.printf("%d  ", currentGPS.sats); tft.setCursor(120, 195); tft.printf("%.0f  ", currentGPS.course);
@@ -439,20 +473,26 @@ void refreshDisplayData() {
     tft.setCursor(10, 120); tft.print("RSSI: "); tft.print(WiFi.RSSI()); tft.println(" dBm");
     tft.setCursor(10, 140); tft.print("MAC: "); tft.println(WiFi.macAddress());
   }
-  else if (currentPage == 5) { // PREVISIONS
+  else if (currentPage == 5) { // PREVISIONS (NEW)
       const char* labels[3] = {"Demain", "J + 2", "J + 3"};
+      
       for(int i=0; i<3; i++) {
-          int y = 80 + (i*50); 
+          int y = 80 + (i*50); // Positions: 80, 130, 180
+          
+          // Label Jour
           tft.setTextSize(2); tft.setTextColor(C_WHITE, C_BLACK);
           tft.setCursor(10, y); tft.print(labels[i]);
           
-          // ICONE METEO PREVUE (Vectoriel)
-          // On efface zone icone
-          tft.fillRect(100, y-10, 40, 30, C_BLACK);
-          drawWeatherByCode(tft, 120, y+5, apiWeather.forecastCode[i]);
+          // Icône couleur
+          tft.fillCircle(110, y+7, 10, getWeatherColor(apiWeather.forecastCode[i]));
           
-          tft.setTextColor(C_BLUE, C_BLACK); tft.setCursor(160, y); tft.printf("%.0f", apiWeather.forecastMin[i]);
-          tft.setTextColor(C_RED, C_BLACK); tft.setCursor(200, y); tft.printf("%.0f", apiWeather.forecastMax[i]);
+          // Min (Bleu)
+          tft.setTextColor(C_BLUE, C_BLACK);
+          tft.setCursor(140, y); tft.printf("%.0f", apiWeather.forecastMin[i]);
+          
+          // Max (Rouge)
+          tft.setTextColor(C_RED, C_BLACK);
+          tft.setCursor(190, y); tft.printf("%.0f", apiWeather.forecastMax[i]);
       }
   }
 }
