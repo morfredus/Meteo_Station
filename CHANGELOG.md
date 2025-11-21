@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.8.0] - 2025-11-22
+### Architecture de Données (Data Provider)
+- **OpenWeatherMap (OWM) :** Devient le fournisseur météo principal.
+    - Utilise l'API "One Call" pour récupérer : Météo Actuelle, Prévisions journalières, Alertes Météo.
+    - Utilise l'API "Air Pollution" pour récupérer l'indice AQI (Qualité de l'Air).
+- **Redondance (Failover) :** Si OWM échoue (timeout ou erreur), le système bascule automatiquement sur **Open-Meteo**.
+- **Conversion :** Ajout d'un convertisseur de codes météo (OWM ID vers WMO Code) pour assurer la compatibilité avec le moteur graphique.
+
+### Interface
+- **Page 1 (Environnement) :** Ajout de l'affichage de l'AQI (Qualité de l'Air) avec code couleur (1=Bon/Vert à 5=Dangereux/Violet).
+- **Feedback :** L'indicateur de mise à jour affiche "OWM..." ou "OPM..." selon la source utilisée.
+  
 ## [1.7.0] - 2025-11-21
 ### Performance & Stability
 - **Network (Anti-Freeze):** Added a **3000ms Timeout** on Weather HTTP requests.
