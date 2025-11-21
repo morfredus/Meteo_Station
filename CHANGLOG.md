@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.3.0] - 2025-11-21
+### Audio & Visual
+- **Sound:** Completely rewritten `beep()` function.
+    - WiFi Connected: 2 fast beeps.
+    - GPS Fix: 3 fast beeps (triggered only once upon fix).
+    - Button Press: 1 short beep.
+    - Replaced `tone()` with non-blocking PWM logic for better compatibility with passive buzzers on S3.
+- **Graphics:** Introduced Bitmap Icons (`icons.h`) replacing colored circles.
+    - Main Screen: Large icon for current weather.
+    - Forecast Screen: Icons for each day (Sun, Cloud, Rain).
+    - Icons are tinted dynamically (Yellow for sun, Grey for cloud, Blue for rain).
+
 ## [1.2.0] - 2025-11-21
 ### Added
 - **Page 5 (Forecast):** Added a 3-day weather forecast page (Max/Min temps, Weather Icons).
