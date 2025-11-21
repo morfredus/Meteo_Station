@@ -487,12 +487,4 @@ void refreshDisplayData() {
           tft.fillCircle(110, y+7, 10, getWeatherColor(apiWeather.forecastCode[i]));
           
           // Min (Bleu)
-          tft.setTextColor(C_BLUE, C_BLACK);
-          tft.setCursor(140, y); tft.printf("%.0f", apiWeather.forecastMin[i]);
-          
-          // Max (Rouge)
-          tft.setTextColor(C_RED, C_BLACK);
-          tft.setCursor(190, y); tft.printf("%.0f", apiWeather.forecastMax[i]);
-      }
-  }
-}
+    

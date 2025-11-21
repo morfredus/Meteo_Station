@@ -1,6 +1,18 @@
 # Changelog
 
-
+## [1.4.0] - 2025-11-21
+### Expérience Utilisateur (UX)
+- **Réorganisation des Pages :** Nouvel ordre de navigation plus logique :
+    1. Résumé
+    2. Environnement
+    3. Prévisions
+    4. Alertes (Conditionnel)
+    5. GPS
+    6. Réseau
+- **Page Alertes Intelligente :**
+    - Cette page est **masquée** dans la navigation normale si aucune alerte n'est active.
+    - Elle s'affiche **automatiquement** et immédiatement dès qu'une alerte est détectée.
+- 
 ## [1.3.1] - 2025-11-21
 ### Design & Graphisme
 - **Moteur Graphique :** Remplacement des bitmaps statiques par du **"Flat Design" procédural**.
