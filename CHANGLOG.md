@@ -1,5 +1,18 @@
 # Changelog
 
+
+## [1.3.1] - 2025-11-21
+### Design & Graphisme
+- **Moteur Graphique :** Remplacement des bitmaps statiques par du **"Flat Design" procédural**.
+- **Icones Météo :** Création de 6 fonctions de dessin vectoriel pour des icônes nettes et colorées :
+    - `drawSun` (Soleil radieux)
+    - `drawCloud` (Nuages volumétriques)
+    - `drawPartlyCloudy` (Soleil caché par nuage)
+    - `drawRain` (Nuage + Gouttes bleues)
+    - `drawStorm` (Nuage sombre + Éclair jaune)
+    - `drawSnow` (Nuage + Flocons blancs)
+- **Logique :** Mapping exhaustif des codes WMO Open-Meteo vers ces nouvelles icônes.
+- 
 ## [1.3.0] - 2025-11-21
 ### Audio & Visual
 - **Sound:** Completely rewritten `beep()` function.

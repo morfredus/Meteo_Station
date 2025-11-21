@@ -17,7 +17,7 @@
 
 #include "config.h"
 #include "web_page.h"
-#include "icons.h" // <--- AJOUT DES ICONES
+#include "weather_graphics.h" // <--- NOUVEAU FICHIER
 
 // ================= OBJETS GLOBAUX =================
 WiFiMulti wifiMulti;
@@ -62,12 +62,11 @@ struct GPSData {
 
 bool alertActive = false;
 String alertMessage = "Aucune alerte";
-bool gpsFixNotified = false; // Pour ne pas biper en boucle
+bool gpsFixNotified = false;
 
 int currentPage = 0;
 const int TOTAL_PAGES = 6;
 
-// Timers
 unsigned long lastTimeSensor = 0;
 unsigned long lastTimeWeather = 0;
 unsigned long lastTimeTelegram = 0;
@@ -98,12 +97,10 @@ void fetchWeather();
 void handleTelegram();
 void refreshDisplayData();
 void drawFullPage();
-void beep(int count, int duration); // Nouveau système de son
+void beep(int count, int duration);
 void setNeoPixelStatus();
 void handleButtonLogic();
-uint16_t getWeatherColor(int code);
-const unsigned char* getWeatherIcon(int code); // Helper Icone
-void drawWeatherIcon(int x, int y, int code);
+// Plus besoin de getWeatherIcon() -> géré par weather_graphics.h
 
 // ================= SETUP =================
 void setup() {
@@ -115,9 +112,7 @@ void setup() {
   attachInterrupt(digitalPinToInterrupt(PIN_BUTTON_PAGE), isrPageBtn, FALLING);
   attachInterrupt(digitalPinToInterrupt(PIN_BUTTON_ACTION), isrActionBtn, FALLING);
 
-  // Config Buzzer
   pinMode(PIN_BUZZER, OUTPUT);
-  // Setup LEDC pour Buzzer S3
   #ifndef BUZZER_LEDC_CHANNEL
     #define BUZZER_LEDC_CHANNEL 0
   #endif
@@ -186,12 +181,10 @@ void loop() {
     currentGPS.sats = gps.satellites.value();
     currentGPS.isValid = true;
     
-    // 3 BIPS au FIX (une seule fois)
     if (!gpsFixNotified && currentGPS.isValid) {
         beep(3, 80); 
         gpsFixNotified = true;
     }
-
     char buffDate[12]; sprintf(buffDate, "%02d/%02d/%02d", gps.date.day(), gps.date.month(), gps.date.year());
     currentGPS.date = String(buffDate);
     char buffTime[10]; sprintf(buffTime, "%02d:%02d:%02d", gps.time.hour(), gps.time.minute(), gps.time.second());
@@ -224,44 +217,22 @@ void loop() {
   }
 }
 
-// ================= LOGIQUE METIER =================
+// ================= LOGIQUE =================
 
 void handleButtonLogic() {
   if (flagPagePressed) {
-    beep(1, 50); // Bip court bouton
+    beep(1, 50);
     flagPagePressed = false;
     currentPage++;
     if (currentPage >= TOTAL_PAGES) currentPage = 0;
     drawFullPage(); refreshDisplayData();
   }
   if (flagActionPressed) {
-    beep(1, 50); // Bip court bouton
+    beep(1, 50);
     flagActionPressed = false;
     tft.setCursor(220, 5); tft.setTextColor(C_YELLOW, C_BLUE); tft.print("*");
     fetchWeather(); refreshDisplayData();
   }
-}
-
-// Helper couleur WMO
-uint16_t getWeatherColor(int code) {
-    if (code <= 1) return C_YELLOW; // Soleil
-    if (code <= 3) return C_GREY;   // Nuage
-    if (code <= 48) return C_GREY;  // Brouillard
-    if (code <= 67) return C_BLUE;  // Pluie
-    if (code >= 95) return C_RED;   // Orage
-    return C_WHITE; // Neige/Autre
-}
-
-// Helper Icone WMO
-const unsigned char* getWeatherIcon(int code) {
-    if (code <= 1) return icon_sun;
-    if (code <= 48) return icon_cloud; // Nuage ou Brouillard
-    if (code >= 95) return icon_rain; // Orage (a defaut d'icone eclair, on met pluie ou on reutilise)
-    return icon_rain; // Pluie/Neige par defaut
-}
-
-void drawWeatherIcon(int x, int y, int code) {
-    tft.drawBitmap(x, y, getWeatherIcon(code), 48, 48, getWeatherColor(code));
 }
 
 void fetchWeather() {
@@ -292,13 +263,12 @@ void fetchWeather() {
   http.end();
 }
 
-// NOUVELLE FONCTION DE SON ROBUSTE
 void beep(int count, int duration) {
     for (int i = 0; i < count; i++) {
-        ledcWriteTone(BUZZER_LEDC_CHANNEL, 2000); // 2kHz
+        ledcWriteTone(BUZZER_LEDC_CHANNEL, 2000);
         delay(duration);
-        ledcWriteTone(BUZZER_LEDC_CHANNEL, 0);    // Silence
-        if (i < count - 1) delay(duration);       // Pause entre bips
+        ledcWriteTone(BUZZER_LEDC_CHANNEL, 0);
+        if (i < count - 1) delay(duration);
     }
 }
 
@@ -318,8 +288,9 @@ void handleTelegram() {
 
 void drawStartupScreen() {
   tft.fillScreen(C_BLACK);
-  // Petit logo au boot
-  tft.fillCircle(120, 80, 30, C_ORANGE); 
+  // On utilise aussi notre moteur graphique pour le boot !
+  drawSun(tft, 120, 80); 
+  
   tft.setTextSize(2); tft.setTextColor(C_WHITE);
   tft.setCursor(40, 140); tft.print("METEO STATION");
   tft.setTextSize(1); tft.setTextColor(C_GREY);
@@ -340,10 +311,7 @@ void drawStartupScreen() {
     delay(100);
   }
   tft.fillRect(42, 202, 156, 6, C_GREEN);
-  
-  // 2 BIPS CONNEXION WIFI
   beep(2, 100);
-  
   tft.setCursor(40, 215); tft.setTextColor(C_GREEN); tft.print("Succes: " + WiFi.SSID());
   delay(1500);
 }
@@ -398,10 +366,6 @@ void drawFullPage() {
   }
   else if (currentPage == 3) { // GPS
     tft.setCursor(10, 45); tft.print("DONNEES GPS"); tft.drawLine(10, 65, 230, 65, C_GREY);
-    tft.setTextSize(1); tft.setTextColor(C_GREY);
-    tft.setCursor(10, 80); tft.print("LATITUDE"); tft.setCursor(120, 80); tft.print("LONGITUDE");
-    tft.setCursor(10, 130); tft.print("ALTITUDE"); tft.setCursor(120, 130); tft.print("VITESSE");
-    tft.setCursor(10, 180); tft.print("SATELLITES"); tft.setCursor(120, 180); tft.print("CAP");
   }
   else if (currentPage == 4) { // RESEAU
      tft.setCursor(10, 45); tft.print("RESEAU & SYS"); tft.drawLine(10, 65, 230, 65, C_GREY);
@@ -437,8 +401,11 @@ void refreshDisplayData() {
     tft.setTextSize(3);
     tft.setCursor(10, 80); tft.printf("%.1f C  ", localSensor.temp);
     tft.setCursor(10, 160); tft.printf("%.1f C  ", apiWeather.temp);
-    // ICONE METEO ACTUELLE (Large)
-    drawWeatherIcon(180, 150, apiWeather.weatherCode);
+    
+    // === ICONE METEO DESSINÉE ===
+    // On efface d'abord la zone (pour éviter les traces des anciens dessins)
+    tft.fillRect(180, 140, 50, 50, C_BLACK); 
+    drawWeatherByCode(tft, 200, 165, apiWeather.weatherCode);
   }
   else if (currentPage == 1) {
     tft.setTextSize(2);
@@ -479,8 +446,10 @@ void refreshDisplayData() {
           tft.setTextSize(2); tft.setTextColor(C_WHITE, C_BLACK);
           tft.setCursor(10, y); tft.print(labels[i]);
           
-          // ICONE METEO PREVUE (48x48)
-          drawWeatherIcon(110, y-10, apiWeather.forecastCode[i]);
+          // ICONE METEO PREVUE (Vectoriel)
+          // On efface zone icone
+          tft.fillRect(100, y-10, 40, 30, C_BLACK);
+          drawWeatherByCode(tft, 120, y+5, apiWeather.forecastCode[i]);
           
           tft.setTextColor(C_BLUE, C_BLACK); tft.setCursor(160, y); tft.printf("%.0f", apiWeather.forecastMin[i]);
           tft.setTextColor(C_RED, C_BLACK); tft.setCursor(200, y); tft.printf("%.0f", apiWeather.forecastMax[i]);
