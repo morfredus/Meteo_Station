@@ -1,6 +1,21 @@
 # Changelog
 
-## [1.8.1] - 2025-11-22
+## [1.9.3] - 2025-11-22
+### Correctifs de Compilation
+- **SSL/Telegram :** Suppression de `TELEGRAM_CERTIFICATE_ROOT` (non déclaré). Remplacement par `clientSEC.setInsecure()` pour garantir une connexion SSL fonctionnelle sans maintenance de certificat.
+- **ArduinoJson v7 :** Correction du warning `containsKey` (déprécié). Remplacé par la syntaxe native v7 `doc["alerts"].is<JsonArray>()`.
+
+## [1.9.0] - 2025-11-22
+### Architecture Logicielle
+- **Telegram :** Remplacement complet de la bibliothèque obsolète `UniversalTelegramBot` par **`AsyncTelegram2`**.
+    - **Avantages :** Compatibilité native ArduinoJson v7 (plus de warnings à la compilation), meilleure gestion SSL/TLS, empreinte mémoire optimisée.
+    - **Code :** Réécriture de la fonction `handleTelegram()` pour utiliser la logique non-bloquante de la nouvelle librairie.
+
+### Nettoyage
+- **Dépendances :** Suppression des flags de suppression de warnings (`ARDUINOJSON_DEPRECATED_WARNINGS`) qui ne sont plus nécessaires.
+
+## [1.8.1] - 2
+025-11-22
 ### Corrections & Améliorations
 - **Provider Météo :** Affichage du nom complet du fournisseur de données ("OpenWeatherMap" ou "Open-Meteo") sur la page Système et Réseau.
 - **Qualité de l'Air (AQI) :**
