@@ -8,7 +8,7 @@
 #include <ArduinoJson.h>
 #include <AsyncTelegram2.h>
 #include <Adafruit_GFX.h>
-#include <Adafruit_ST7789.h>
+#include <Adafruit_ST7789.h> 
 #include <Adafruit_AHTX0.h>
 #include <Adafruit_BMP280.h>
 #include <Adafruit_NeoPixel.h>
@@ -22,8 +22,6 @@
 // ================= OBJETS GLOBAUX =================
 WiFiMulti wifiMulti;
 AsyncWebServer server(80);
-
-// Telegram Objects
 WiFiClientSecure clientSEC;
 AsyncTelegram2 bot(clientSEC);
 
@@ -39,7 +37,12 @@ struct SensorData {
   float hum = 0.0;
   float pres = 0.0;
   int lux = 0;
+  String trend = "→";
 } localSensor;
+
+float pressureHistory = 0.0;
+unsigned long lastPressureTime = 0;
+bool autoBrightnessMode = true; 
 
 struct WeatherData {
   float temp = 0.0;
@@ -89,6 +92,8 @@ void IRAM_ATTR isrActionBtn() { flagActionPressed = true; }
 void drawStartupScreen(); 
 void initSensors();
 void updateSensors();
+void adjustBrightness();
+void updatePressureTrend(float currentPres);
 void fetchWeather();          
 bool fetchOpenWeatherMap();   
 bool fetchOpenMeteo();        
@@ -102,6 +107,8 @@ void setNeoPixelStatus();
 void handleButtonLogic();
 void drawSunRays(int cx, int cy, int offsetAngle, uint16_t color);
 String getUptime();
+String cleanText(String s);
+void showToastMessage(String msg, uint16_t color);
 
 // ================= SETUP =================
 void setup() {
@@ -120,9 +127,14 @@ void setup() {
   ledcSetup(BUZZER_LEDC_CHANNEL, 2000, 8);
   ledcAttachPin(PIN_BUZZER, BUZZER_LEDC_CHANNEL);
 
+  #ifndef BACKLIGHT_LEDC_CHANNEL
+    #define BACKLIGHT_LEDC_CHANNEL 1 
+  #endif
+  ledcSetup(BACKLIGHT_LEDC_CHANNEL, 12000, 8);
+  ledcAttachPin(TFT_BL, BACKLIGHT_LEDC_CHANNEL);
+  ledcWrite(BACKLIGHT_LEDC_CHANNEL, 255);
+
   pinMode(PIN_LIGHT_SENSOR, INPUT);
-  pinMode(TFT_BL, OUTPUT);
-  digitalWrite(TFT_BL, HIGH);
 
   pixels.begin();
   pixels.setBrightness(NEOPIXEL_BRIGHTNESS);
@@ -139,10 +151,7 @@ void setup() {
 
   configTime(3600, 3600, "pool.ntp.org");
 
-  // --- INIT TELEGRAM (SSL Fixe) ---
-  // On utilise setInsecure pour eviter les erreurs de certificats root
   clientSEC.setInsecure(); 
-  
   bot.setUpdateTime(2000); 
   bot.setTelegramToken(TELEGRAM_BOT_TOKEN);
   
@@ -155,17 +164,32 @@ void setup() {
   });
   
   server.on("/api/data", HTTP_GET, [](AsyncWebServerRequest *request){
-    JsonDocument doc;
+    JsonDocument doc; 
     doc["sensor"]["temp"] = localSensor.temp;
     doc["sensor"]["hum"] = localSensor.hum;
+    doc["sensor"]["pres"] = localSensor.pres;
+    doc["sensor"]["lux"] = localSensor.lux;
+    doc["sensor"]["trend"] = localSensor.trend;
     doc["weather"]["temp"] = apiWeather.temp;
     doc["weather"]["code"] = apiWeather.weatherCode;
     doc["weather"]["aqi"] = apiWeather.aqi;
     doc["weather"]["provider"] = apiWeather.provider;
+    
+    JsonArray f = doc["forecast"].to<JsonArray>();
+    for(int i=0; i<3; i++) {
+        JsonObject day = f.add<JsonObject>();
+        day["min"] = apiWeather.forecastMin[i];
+        day["max"] = apiWeather.forecastMax[i];
+    }
+    
     doc["gps"]["lat"] = currentGPS.lat;
     doc["gps"]["lon"] = currentGPS.lon;
     doc["gps"]["valid"] = currentGPS.isValid;
+    doc["gps"]["sats"] = currentGPS.sats;
+    doc["sys"]["uptime"] = getUptime();
+    doc["sys"]["backlight"] = autoBrightnessMode ? "Auto" : "Max";
     doc["alert"] = alertActive;
+    
     String response; serializeJson(doc, response);
     request->send(200, "application/json", response);
   });
@@ -210,6 +234,7 @@ void loop() {
 
   if (now - lastTimeSensor > INTERVAL_SENSORS) {
     updateSensors();
+    adjustBrightness();
     setNeoPixelStatus();
     refreshDisplayData();
     lastTimeSensor = now;
@@ -221,7 +246,7 @@ void loop() {
     lastTimeWeather = now;
   }
 
-  handleTelegram(); // Check messages
+  handleTelegram(); 
 
   if (now - lastDisplayUpdate > 1000) {
     refreshDisplayData();
@@ -231,32 +256,74 @@ void loop() {
 
 // ================= LOGIQUE METIER =================
 
+String cleanText(String s) {
+    s.replace("é", "e"); s.replace("è", "e"); s.replace("ê", "e"); s.replace("ë", "e");
+    s.replace("à", "a"); s.replace("â", "a");
+    s.replace("î", "i"); s.replace("ï", "i");
+    s.replace("ô", "o");
+    s.replace("ù", "u"); s.replace("û", "u");
+    s.replace("ç", "c");
+    s.replace("É", "E"); s.replace("È", "E"); s.replace("Ê", "E");
+    s.replace("À", "A"); s.replace("Â", "A");
+    s.replace("Ô", "O"); s.replace("Ù", "U"); s.replace("Ç", "C");
+    s.replace("°", String((char)247)); 
+    return s;
+}
+
+void adjustBrightness() {
+    if (autoBrightnessMode) {
+        int luxRaw = analogRead(PIN_LIGHT_SENSOR);
+        int pwmVal = map(luxRaw, 0, 4095, 10, 255);
+        if (pwmVal < 10) pwmVal = 10;
+        if (pwmVal > 255) pwmVal = 255;
+        ledcWrite(BACKLIGHT_LEDC_CHANNEL, pwmVal);
+    } else {
+        ledcWrite(BACKLIGHT_LEDC_CHANNEL, 255);
+    }
+}
+
+void updatePressureTrend(float currentPres) {
+    if (pressureHistory == 0.0) {
+        pressureHistory = currentPres;
+        lastPressureTime = millis();
+        return;
+    }
+    if (millis() - lastPressureTime > 3600000) {
+        float diff = currentPres - pressureHistory;
+        if (diff > 0.5) localSensor.trend = "Hausse";
+        else if (diff < -0.5) localSensor.trend = "Baisse";
+        else localSensor.trend = "Stable";
+        pressureHistory = currentPres;
+        lastPressureTime = millis();
+    }
+}
+
+void showToastMessage(String msg, uint16_t color) {
+    int boxW = 200; int boxH = 40;
+    int boxX = (240 - boxW) / 2;
+    int boxY = 50; 
+    tft.fillRoundRect(boxX, boxY, boxW, boxH, 8, C_WHITE);
+    tft.drawRoundRect(boxX, boxY, boxW, boxH, 8, color);
+    tft.setTextColor(C_BLACK); tft.setTextSize(2);
+    int textX = boxX + (boxW - (msg.length() * 12)) / 2;
+    tft.setCursor(textX, boxY + 12);
+    tft.print(msg);
+    delay(1000);
+    tft.fillRect(boxX, boxY, boxW, boxH, C_BLACK);
+    drawFullPage(); refreshDisplayData();
+}
+
 void handleTelegram() {
   TBMessage msg;
-  
   if (bot.getNewMessage(msg)) {
-      if (String(msg.chatId) != TELEGRAM_CHAT_ID) {
-          bot.sendMessage(msg, "Unauthorized.");
-          return;
-      }
-
+      if (String(msg.chatId) != TELEGRAM_CHAT_ID) return;
       String text = msg.text;
-      
-      if (text.equalsIgnoreCase("/start")) {
-          bot.sendMessage(msg, "Station v" + String(PROJECT_VERSION) + "\n/status");
-      } 
+      if (text.equalsIgnoreCase("/start")) bot.sendMessage(msg, "Station v" + String(PROJECT_VERSION) + "\n/status");
       else if (text.equalsIgnoreCase("/status")) {
-          String s = "🌡 Int: " + String(localSensor.temp) + "°C | " + String(localSensor.hum) + "%\n";
-          s += "🌍 Ext: " + String(apiWeather.temp) + "°C\n";
-          s += "☁️ AQI: " + String(apiWeather.aqi) + "/5\n";
-          s += "📍 GPS: " + String(currentGPS.isValid ? "FIX OK" : "Searching...");
+          String s = "🌡 Int: " + String(localSensor.temp) + "C\n🌍 Ext: " + String(apiWeather.temp) + "C\nAQI: " + String(apiWeather.aqi);
           bot.sendMessage(msg, s);
       }
-      else if (text.equalsIgnoreCase("/reboot")) {
-          bot.sendMessage(msg, "Rebooting...");
-          delay(100);
-          ESP.restart();
-      }
+      else if (text.equalsIgnoreCase("/reboot")) ESP.restart();
   }
 }
 
@@ -264,7 +331,6 @@ void handleButtonLogic() {
   if (millis() - lastButtonActionTime < REFRACTORY_PERIOD) {
       flagPagePressed = false; flagActionPressed = false; return; 
   }
-
   if (flagPagePressed) {
     beep(1, 50);
     flagPagePressed = false;
@@ -273,16 +339,13 @@ void handleButtonLogic() {
     if (currentPage >= TOTAL_PAGES) currentPage = 0;
     drawFullPage(); refreshDisplayData();
   }
-
   if (flagActionPressed) {
-    beep(1, 50);
     flagActionPressed = false;
     lastButtonActionTime = millis();
-    
-    tft.setCursor(200, 5); tft.setTextColor(C_YELLOW, C_BLUE); tft.print("MAJ..."); 
-    fetchWeather(); 
-    tft.fillRect(200, 0, 40, 20, C_BLUE);
-    refreshDisplayData();
+    autoBrightnessMode = !autoBrightnessMode;
+    if(autoBrightnessMode) { beep(1, 100); showToastMessage("LUM: AUTO", C_BLUE); } 
+    else { beep(2, 80); showToastMessage("LUM: MAX", C_ORANGE); }
+    adjustBrightness();
   }
 }
 
@@ -298,119 +361,86 @@ String getUptime() {
 
 void fetchWeather() {
     if (wifiMulti.run() != WL_CONNECTED) return;
-    
-    bool successOWM = fetchOpenWeatherMap();
-    if (successOWM) {
-        apiWeather.provider = "OpenWeatherMap";
-    } else {
-        Serial.println("OWM Fail -> Fallback OpenMeteo");
-        bool successOPM = fetchOpenMeteo();
-        if (successOPM) {
-            apiWeather.provider = "Open-Meteo";
-        } else {
-            apiWeather.provider = "Erreur Reseau";
-        }
-    }
+    tft.fillRect(210, 5, 20, 20, C_BLUE); 
+    tft.setCursor(215, 5); tft.setTextColor(C_YELLOW); tft.setTextSize(1); tft.print("DL");
 
-    bool successAQI = fetchAQI_OWM();
-    if (!successAQI) {
-        apiWeather.aqi = 0; 
+    bool successOWM = fetchOpenWeatherMap();
+    if (successOWM) apiWeather.provider = "OpenWeatherMap";
+    else {
+        if (fetchOpenMeteo()) apiWeather.provider = "Open-Meteo";
+        else apiWeather.provider = "Erreur Reseau";
     }
+    fetchAQI_OWM(); 
+    tft.fillRect(210, 5, 20, 20, C_BLUE);
 }
 
 bool fetchOpenWeatherMap() {
-    HTTPClient http;
-    http.setTimeout(4000);
+    HTTPClient http; http.setTimeout(4000);
     String url = String("https://api.openweathermap.org/data/2.5/onecall?lat=") + 
                  String(currentGPS.lat, 4) + "&lon=" + String(currentGPS.lon, 4) + 
                  "&exclude=minutely,hourly&units=metric&appid=" + OPENWEATHER_API_KEY;
-
     http.begin(url);
-    int httpCode = http.GET();
-    
-    if (httpCode == 200) {
+    if (http.GET() == 200) {
         JsonDocument doc;
-        DeserializationError error = deserializeJson(doc, http.getString());
-        if (!error) {
+        if (!deserializeJson(doc, http.getString())) {
             apiWeather.temp = doc["current"]["temp"];
             apiWeather.pressureMSL = doc["current"]["pressure"];
-            int owmId = doc["current"]["weather"][0]["id"];
-            apiWeather.weatherCode = mapOWMtoWMO(owmId);
-
+            apiWeather.weatherCode = mapOWMtoWMO(doc["current"]["weather"][0]["id"]);
             for(int i=0; i<3; i++) {
                 apiWeather.forecastMin[i] = doc["daily"][i+1]["temp"]["min"];
                 apiWeather.forecastMax[i] = doc["daily"][i+1]["temp"]["max"];
-                int fId = doc["daily"][i+1]["weather"][0]["id"];
-                apiWeather.forecastCode[i] = mapOWMtoWMO(fId);
+                apiWeather.forecastCode[i] = mapOWMtoWMO(doc["daily"][i+1]["weather"][0]["id"]);
             }
-
-            // --- CORRECTION WARNING JSON ---
-            // Avant: if (doc.containsKey("alerts"))
             if (doc["alerts"].is<JsonArray>()) {
-                alertActive = true;
-                String event = doc["alerts"][0]["event"];
-                alertMessage = event;
-            } else {
-                if (localSensor.temp < ALERT_TEMP_HIGH && localSensor.temp > ALERT_TEMP_LOW) {
-                    alertActive = false;
-                    alertMessage = "Aucune alerte";
-                }
+                alertActive = true; alertMessage = doc["alerts"][0]["event"].as<String>();
+            } else if (localSensor.temp < ALERT_TEMP_HIGH && localSensor.temp > ALERT_TEMP_LOW) {
+                alertActive = false; alertMessage = "Aucune alerte";
             }
-            http.end();
-            return true;
+            http.end(); return true;
         }
     }
-    http.end();
-    return false;
+    http.end(); return false;
 }
 
 bool fetchOpenMeteo() {
-    HTTPClient http;
-    http.setTimeout(3000); 
+    HTTPClient http; http.setTimeout(3000); 
     String url = String("http://api.open-meteo.com/v1/forecast?latitude=") + 
                String(currentGPS.lat, 4) + "&longitude=" + String(currentGPS.lon, 4) + 
                "&current=temperature_2m,weather_code,pressure_msl&daily=weather_code,temperature_2m_max,temperature_2m_min&timezone=auto";
     http.begin(url);
     if (http.GET() == 200) {
-        JsonDocument doc;
-        deserializeJson(doc, http.getString());
+        JsonDocument doc; deserializeJson(doc, http.getString());
         apiWeather.temp = doc["current"]["temperature_2m"];
         apiWeather.weatherCode = doc["current"]["weather_code"];
         float p = doc["current"]["pressure_msl"];
         if(p > 800) apiWeather.pressureMSL = p;
-        
         for(int i=0; i<3; i++) {
             apiWeather.forecastCode[i] = doc["daily"]["weather_code"][i+1];
             apiWeather.forecastMax[i] = doc["daily"]["temperature_2m_max"][i+1];
             apiWeather.forecastMin[i] = doc["daily"]["temperature_2m_min"][i+1];
         }
-        http.end();
-        return true;
+        http.end(); return true;
     }
-    http.end();
-    return false;
+    http.end(); return false;
 }
 
 bool fetchAQI_OWM() {
-    HTTPClient http;
-    http.setTimeout(3000);
-    String url = String("http://api.openweathermap.org/data/2.5/air_pollution?lat=") + 
+    WiFiClientSecure clientAQI;
+    clientAQI.setInsecure(); 
+    HTTPClient http; http.setTimeout(3000);
+    String url = String("https://api.openweathermap.org/data/2.5/air_pollution?lat=") + 
                  String(currentGPS.lat, 4) + "&lon=" + String(currentGPS.lon, 4) + 
                  "&appid=" + OPENWEATHER_API_KEY;
-    
-    http.begin(url);
+    http.begin(clientAQI, url); 
     int code = http.GET();
     if(code == 200) {
         JsonDocument doc;
-        DeserializationError err = deserializeJson(doc, http.getString());
-        if(!err) {
+        if(!deserializeJson(doc, http.getString())) {
             apiWeather.aqi = doc["list"][0]["main"]["aqi"];
-            http.end();
-            return true;
+            http.end(); return true;
         }
     }
-    http.end();
-    return false;
+    http.end(); return false;
 }
 
 int mapOWMtoWMO(int id) {
@@ -428,10 +458,8 @@ int mapOWMtoWMO(int id) {
 
 void beep(int count, int duration) {
     for (int i = 0; i < count; i++) {
-        ledcWriteTone(BUZZER_LEDC_CHANNEL, 2000);
-        delay(duration);
-        ledcWriteTone(BUZZER_LEDC_CHANNEL, 0);
-        if (i < count - 1) delay(duration);
+        ledcWriteTone(BUZZER_LEDC_CHANNEL, 2000); delay(duration);
+        ledcWriteTone(BUZZER_LEDC_CHANNEL, 0); if (i < count - 1) delay(duration);
     }
 }
 
@@ -440,8 +468,7 @@ void drawSunRays(int cx, int cy, int offsetAngle, uint16_t color) {
         float angle = (i * 45 + offsetAngle) * 3.14 / 180.0;
         int x1 = cx + cos(angle) * 35; int y1 = cy + sin(angle) * 35;
         int x2 = cx + cos(angle) * 45; int y2 = cy + sin(angle) * 45;
-        tft.drawLine(x1, y1, x2, y2, color);
-        tft.drawLine(x1+1, y1, x2+1, y2, color);
+        tft.drawLine(x1, y1, x2, y2, color); tft.drawLine(x1+1, y1, x2+1, y2, color);
     }
 }
 
@@ -455,7 +482,7 @@ void drawStartupScreen() {
 
   wifiMulti.addAP(ssid_1, password_1);
   wifiMulti.addAP(ssid_2, password_2);
-  tft.setCursor(50, 210); tft.setTextColor(C_WHITE); tft.print("Connexion WiFi...");
+  tft.setCursor(50, 210); tft.setTextColor(C_WHITE); tft.print(cleanText("Connexion WiFi..."));
 
   int angle = 0;
   while (wifiMulti.run() != WL_CONNECTED) {
@@ -468,7 +495,7 @@ void drawStartupScreen() {
   drawSunRays(120, 90, angle, C_YELLOW);
   tft.fillRect(0, 200, 240, 40, C_BLACK); 
   tft.setCursor(10, 210); tft.setTextColor(C_GREEN); tft.setTextSize(1);
-  tft.print("Connecte: "); tft.println(WiFi.SSID());
+  tft.print(cleanText("Connecté: ")); tft.println(WiFi.SSID());
   beep(2, 100); delay(1500);
 }
 
@@ -483,15 +510,14 @@ void updateSensors() {
   localSensor.temp = t.temperature; localSensor.hum = h.relative_humidity;
   float p = bmp.readPressure();
   if (!isnan(p) && p > 0) localSensor.pres = p / 100.0F;
+  updatePressureTrend(localSensor.pres);
   localSensor.lux = analogRead(PIN_LIGHT_SENSOR);
 
   if (localSensor.temp > ALERT_TEMP_HIGH) { alertActive = true; alertMessage = "Temp HAUTE"; }
   else if (localSensor.temp < ALERT_TEMP_LOW) { alertActive = true; alertMessage = "Temp BASSE"; }
   
   if (alertActive && !lastAlertActive) {
-      currentPage = 5; 
-      beep(5, 100); 
-      drawFullPage(); refreshDisplayData();
+      currentPage = 5; beep(5, 100); drawFullPage(); refreshDisplayData();
   }
   lastAlertActive = alertActive;
 }
@@ -512,30 +538,30 @@ void drawFullPage() {
   tft.setTextColor(C_WHITE); tft.setTextSize(2);
 
   if (currentPage == 0) { // RESUME
-    tft.setCursor(10, 50); tft.print("INTERIEUR");
+    tft.setCursor(10, 50); tft.print(cleanText("INTÉRIEUR"));
     tft.drawLine(10, 70, 230, 70, C_GREY);
-    tft.setCursor(10, 130); tft.print("EXTERIEUR");
+    tft.setCursor(10, 130); tft.print(cleanText("EXTÉRIEUR"));
     tft.drawLine(10, 150, 230, 150, C_GREY);
   }
   else if (currentPage == 1) { // ENVIRONNEMENT
-    tft.setCursor(10, 45); tft.print("ENVIRONNEMENT"); tft.drawLine(10, 65, 230, 65, C_GREY);
+    tft.setCursor(10, 45); tft.print(cleanText("ENVIRONNEMENT")); tft.drawLine(10, 65, 230, 65, C_GREY);
     tft.setTextSize(1); tft.setTextColor(C_GREY);
-    tft.setCursor(10, 80); tft.print("HUMIDITE"); tft.setCursor(120, 80); tft.print("PRESSION");
-    tft.setCursor(10, 140); tft.print("LUMINOSITE"); tft.setCursor(120, 140); tft.print("QUALITE AIR");
+    tft.setCursor(10, 80); tft.print(cleanText("HUMIDITÉ")); tft.setCursor(120, 80); tft.print("PRESSION");
+    tft.setCursor(10, 140); tft.print(cleanText("LUMINOSITÉ")); tft.setCursor(120, 140); tft.print(cleanText("QUALITÉ AIR"));
   }
   else if (currentPage == 2) { // PREVISIONS
-     tft.setCursor(10, 45); tft.print("PREVISIONS (3J)"); tft.drawLine(10, 65, 230, 65, C_GREY);
+     tft.setCursor(10, 45); tft.print(cleanText("PRÉVISIONS (3J)")); tft.drawLine(10, 65, 230, 65, C_GREY);
      tft.drawLine(10, 115, 230, 115, 0x2104);
      tft.drawLine(10, 165, 230, 165, 0x2104);
   }
   else if (currentPage == 3) { // GPS
-    tft.setCursor(10, 45); tft.print("DONNEES GPS"); tft.drawLine(10, 65, 230, 65, C_GREY);
+    tft.setCursor(10, 45); tft.print(cleanText("DONNÉES GPS")); tft.drawLine(10, 65, 230, 65, C_GREY);
   }
   else if (currentPage == 4) { // RESEAU
-     tft.setCursor(10, 45); tft.print("RESEAU & SYS"); tft.drawLine(10, 65, 230, 65, C_GREY);
+     tft.setCursor(10, 45); tft.print(cleanText("RÉSEAU & SYS")); tft.drawLine(10, 65, 230, 65, C_GREY);
   }
   else if (currentPage == 5) { // ETAT SYSTEME
-    tft.setCursor(10, 45); tft.print("ETAT SYSTEME"); tft.drawLine(10, 65, 230, 65, C_GREY);
+    tft.setCursor(10, 45); tft.print(cleanText("ÉTAT SYSTÈME")); tft.drawLine(10, 65, 230, 65, C_GREY);
     tft.drawLine(10, 120, 230, 120, 0x2104);
     tft.drawLine(10, 180, 230, 180, 0x2104);
   }
@@ -570,9 +596,19 @@ void refreshDisplayData() {
   else if (currentPage == 1) {
     tft.setTextSize(2);
     tft.setCursor(10, 95); tft.printf("%.0f %% ", localSensor.hum);
-    tft.setCursor(120, 95); if(isnan(localSensor.pres)) tft.print("-- hPa"); else tft.printf("%.0f hPa", localSensor.pres);
-    tft.setCursor(10, 155); tft.printf("%d lx   ", localSensor.lux);
+    tft.setCursor(120, 95); 
+    if(isnan(localSensor.pres)) tft.print("-- hPa"); 
+    else { 
+        tft.printf("%.0f ", localSensor.pres); 
+        int trendVal = 0;
+        if(localSensor.trend == "Hausse") trendVal = 1;
+        else if(localSensor.trend == "Baisse") trendVal = -1;
+        
+        tft.fillRect(190, 90, 30, 30, C_BLACK); 
+        drawTrendArrow(tft, 200, 95, trendVal);
+    }
     
+    tft.setCursor(10, 155); tft.printf("%d lx   ", localSensor.lux);
     tft.setCursor(120, 155); 
     if (apiWeather.aqi == 0) {
         tft.setTextColor(C_GREY, C_BLACK); tft.print("N/A");
@@ -589,7 +625,7 @@ void refreshDisplayData() {
       for(int i=0; i<3; i++) {
           int y = 80 + (i*50); 
           tft.setTextSize(2); tft.setTextColor(C_WHITE, C_BLACK);
-          tft.setCursor(10, y); tft.print(labels[i]);
+          tft.setCursor(10, y); tft.print(cleanText(labels[i]));
           tft.fillRect(100, y-10, 40, 30, C_BLACK);
           drawWeatherByCode(tft, 120, y+5, apiWeather.forecastCode[i]);
           tft.setTextColor(C_BLUE, C_BLACK); tft.setCursor(160, y); tft.printf("%.0f", apiWeather.forecastMin[i]);
@@ -616,7 +652,7 @@ void refreshDisplayData() {
       tft.fillRect(10, 75, 120, 35, C_BLACK); 
       if(alertActive) {
           tft.setCursor(10, 80); tft.setTextColor(C_RED); tft.setTextSize(2); tft.print("ALERTE !");
-          tft.setCursor(10, 100); tft.setTextSize(1); tft.print(alertMessage);
+          tft.setCursor(10, 100); tft.setTextSize(1); tft.print(cleanText(alertMessage));
           tft.fillCircle(200, 90, 25, C_RED); tft.setTextColor(C_WHITE); tft.setCursor(194, 83); tft.setTextSize(2); tft.print("!");
       } else {
           tft.setCursor(10, 80); tft.setTextColor(C_GREEN); tft.setTextSize(2); tft.print("NOMINAL");
@@ -627,7 +663,7 @@ void refreshDisplayData() {
       tft.setTextColor(C_WHITE, C_BLACK); tft.setTextSize(1);
       tft.setCursor(10, 130); tft.print("Uptime: "); tft.print(getUptime());
       tft.setCursor(10, 145); tft.print("RAM: "); tft.print(ESP.getFreeHeap() / 1024); tft.print(" KB libre");
-      tft.setCursor(10, 160); tft.print("Source Meteo: "); tft.print(apiWeather.provider);
+      tft.setCursor(10, 160); tft.print(cleanText("Source Météo: ")); tft.print(apiWeather.provider);
       
       tft.setCursor(10, 190); tft.print("WiFi: "); tft.print(WiFi.SSID());
       tft.setCursor(10, 205); tft.print("Signal: "); tft.print(WiFi.RSSI()); tft.print(" dBm");

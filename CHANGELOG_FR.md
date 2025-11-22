@@ -1,5 +1,11 @@
 # Historique des Versions (Changelog)
 
+## [2.5.1] - 2025-11-22
+### Correctifs (Hotfix)
+- **Compilation :** Ajout de la fonction manquante `drawTrendArrow()` dans `weather_graphics.h`.
+    - Résout l'erreur `'drawTrendArrow' was not declared in this scope`.
+    - Réintégration des définitions de couleurs `FLAT_GREEN` et `FLAT_RED`.
+
 ## [2.5.0] - 2025-11-22
 ### Retour à la Stabilité (Rollback)
 - **Suppression OTA :** Retrait complet de la fonctionnalité de mise à jour sans fil (`ElegantOTA`) qui causait des conflits de dépendances insolubles avec le serveur web.
