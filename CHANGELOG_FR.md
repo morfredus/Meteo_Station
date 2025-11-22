@@ -1,142 +1,211 @@
-# Changelog
+# Historique des Versions (Changelog)
+
+## [2.5.0] - 2025-11-22
+### Retour à la Stabilité (Rollback)
+- **Suppression OTA :** Retrait complet de la fonctionnalité de mise à jour sans fil (`ElegantOTA`) qui causait des conflits de dépendances insolubles avec le serveur web.
+- **Bibliothèques :** Retour aux versions stables des bibliothèques réseau (`esphome/ESPAsyncWebServer` et `esphome/AsyncTCP`) qui fonctionnaient avant la tentative de mise à jour.
+- **Système :** Le code est désormais identique à la v2.3.1 (stable), prêt pour une utilisation quotidienne fiable.
+
+## [2.4.4] - 2025-11-22
+### Maintenance Critique
+- **Bibliothèques :** Verrouillage strict des versions `mathieucarbou/ESPAsyncWebServer` (v3.6.0) et `mathieucarbou/AsyncTCP` (v3.3.2).
+- **Nettoyage :** Procédure de suppression du cache `.pio` requise pour éliminer les conflits de types (`const AsyncServer`) hérités des anciennes bibliothèques `esphome`.
+
+## [2.4.3] - 2025-11-22
+### Correctifs Techniques (Compilation)
+- **Dépendances :** Remplacement des bibliothèques `ESPAsyncWebServer` et `AsyncTCP` (forks `esphome`) par les forks de **`mathieucarbou`**.
+    - Résout l'erreur critique de compilation C++ (`discarding qualifiers` / `const` correctness).
+    - Assure une meilleure compatibilité avec le Core ESP32 récent.
+- **Code Web :** Remplacement de la méthode dépréciée `request->send_P()` par `request->send()`. La gestion du stockage PROGMEM est désormais automatique.
+
+## [2.4.2] - 2025-11-22
+### Correctifs de Compilation
+- **OTA / Conflits :** Résolution des erreurs "conflicts with a previous declaration" (HTTP_GET, HTTP_POST).
+    - Réorganisation stricte de l'ordre des `#include` dans `main.cpp`.
+    - Définition forcée du flag `ELEGANTOTA_USE_ASYNC_WEBSERVER` avant l'inclusion de la librairie.
+	
+## [2.4.1] - 2025-11-22
+### Correctifs Critiques (Compilation OTA)
+- **ElegantOTA :** Correction du conflit de types entre `AsyncWebServer` et `WebServer` standard.
+    - Ajout du flag `-DELEGANTOTA_USE_ASYNC_WEBSERVER=1` manquant dans la configuration de build.
+    - Ce flag force la bibliothèque OTA à compiler en mode compatible Asynchrone, résolvant l'erreur `no matching function for call to begin`.
+- **Conflits HTTP :** Nettoyage des conflits de déclaration d'énumérations (`HTTP_GET`, `HTTP_POST`...) entre le SDK ESP32 et la bibliothèque AsyncWeb.
+
+## [2.4.0] - 2025-11-22
+### Fonctionnalités Majeures
+- **Mise à jour Sans Fil (OTA) :** Intégration de `ElegantOTA`.
+    - Interface de mise à jour accessible via navigateur web à l'adresse `http://<IP>/update`.
+    - Permet de téléverser les futurs firmwares (`firmware.bin`) sans connexion USB.
+
+### Correctifs
+- **Qualité de l'Air (AQI) :** Correction de l'erreur "N/A".
+    - Cause : Échec de la validation SSL lors de la requête HTTPS vers OpenWeatherMap.
+    - Solution : Implémentation explicite d'un `WiFiClientSecure` en mode `setInsecure()` pour cette requête spécifique.
+
+### Technique
+- **Dépendances :** Ajout de la bibliothèque `ayushsharma82/ElegantOTA`.
+
+## [2.3.1] - 2025-11-22
+### Correctifs (Patch)
+- **Compilation :** Correction de l'erreur critique `TELEGRAM_CERTIFICATE_ROOT`. Remplacement par `clientSEC.setInsecure()` pour s'adapter à la nouvelle bibliothèque Telegram.
+- **JSON :** Correction des méthodes dépréciées (`createNestedArray`) pour une compatibilité stricte avec ArduinoJson v7.
+- **Versionning :** Incrémentation du numéro de patch suite aux correctifs de stabilité.
+
+## [2.3.0] - 2025-11-22
+### Interface & Ergonomie (UX)
+- **Notifications Visuelles (Toast) :** Remplacement des messages textes simples par une **boîte de dialogue centrée** (Pop-up) pour les confirmations d'action (Changement de luminosité, Mise à jour).
+    - Apparaît sous l'entête, texte noir sur fond blanc pour une lisibilité maximale.
+    - Nettoyage parfait de la zone après affichage pour éviter les artefacts graphiques.
+- **Gestion Rétroéclairage :**
+    - Passage de la fréquence PWM à **12 kHz** (plus stable pour le rétroéclairage LED).
+    - Garantie logicielle que le mode "MAX" envoie la valeur brute 255 au contrôleur.
+
+### Correctifs
+- **Affichage :** Correction du positionnement des messages de confirmation qui s'affichaient parfois sur deux lignes.
+
+## [2.2.0] - 2025-11-22
+### Expérience Utilisateur (UX)
+- **Gestion Rétroéclairage :** Modification du comportement du Bouton 2 (Action).
+    - Appui court : Bascule entre le mode **Automatique** (capteur LDR) et le mode **Manuel** (Luminosité 100% force).
+    - Un bip distinctif indique le changement (1 bip = Auto, 2 bips = Max).
+- **Texte & Encodage :**
+    - Amélioration de la fonction `cleanText()` pour supporter les **Majuscules Accentuées** (É, È, À, Ù...).
+    - Application systématique du correcteur sur tous les titres de pages qui s'affichaient mal.
+
+### Suppression
+- **Bouton Action :** Suppression du déclenchement manuel de la mise à jour météo sur le bouton 2 (remplacé par la gestion lumière). La mise à jour reste automatique via timer.
+
+## [2.1.1] - 2025-11-22
+### Correctifs
+- **Versionning :** Correction de la numérotation de version (fusion des correctifs de maintenance 2.0.x et des ajouts graphiques de la 2.1.0).
+- **Code :** Consolidation des correctifs de syntaxe JSON et de la gestion graphique vectorielle.
+
+## [2.1.0] - 2025-11-22
+### Interface & Graphisme
+- **Indicateur de Tendance :** Remplacement des indicateurs textuels (sujets aux bugs d'encodage) par des **flèches graphiques vectorielles**.
+    - ↗ Hausse : Flèche Verte dessinée vers le haut-droite.
+    - ↘ Baisse : Flèche Rouge dessinée vers le bas-droite.
+    - → Stable : Flèche Grise horizontale.
+- **Gestion du Texte :** Introduction de la fonction `cleanText()` pour gérer l'encodage des caractères.
+    - Conversion automatique des accents UTF-8 (é, è, à...) en ASCII standard.
+    - Remplacement du symbole degré (°) par le caractère spécifique de la police GFX (`char 247`).
+
+## [2.0.2] - 2025-11-22
+### Maintenance Code
+- **JSON API (ArduinoJson v7) :** Mise à jour stricte de la syntaxe pour éliminer les avertissements de compilation ("Deprecated").
+    - Remplacement de `createNestedArray` par `.to<JsonArray>()`.
+    - Remplacement de `createNestedObject` par `.add<JsonObject>()`.
+
+## [2.0.1] - 2025-11-22
+### Correctifs Critiques
+- **Compilation :** Suppression définitive des variables obsolètes (`TELEGRAM_CERTIFICATE_ROOT`) issues des anciennes versions.
+- **Configuration :** Ajout du flag `-D ARDUINOJSON_DEPRECATED_WARNINGS=0` pour nettoyer les logs de compilation liés aux dépendances externes non mises à jour.
+
+## [2.0.0] - 2025-11-22
+### VERSION MAJEURE (Major Release)
+### Nouvelles Fonctionnalités
+- **Luminosité Adaptative (Auto-Dimming) :** Le rétroéclairage de l'écran s'ajuste désormais automatiquement et fluidement en fonction de la lumière ambiante captée par la LDR.
+- **Indicateur de Tendance :** Analyse de la pression atmosphérique sur 1 heure pour déterminer la tendance météo locale (Hausse/Baisse/Stable).
+- **Dashboard Web 2.0 :** Refonte totale de l'interface Web (HTML5/CSS Grid).
+    - Design "Dark Mode" réactif.
+    - Affichage complet : Jauges, AQI coloré, Prévisions J+3, Infos GPS et Système.
+    - Rafraîchissement automatique (AJAX) sans rechargement de page.
+
+### Technique
+- **Matériel :** Activation d'un second canal PWM (LEDC) pour le pilotage du rétroéclairage (`TFT_BL`).
+- **API :** Enrichissement du JSON de sortie pour inclure les données de tendance, d'uptime et les tableaux de prévisions structurés.
 
 ## [1.9.3] - 2025-11-22
-### Correctifs de Compilation
-- **SSL/Telegram :** Suppression de `TELEGRAM_CERTIFICATE_ROOT` (non déclaré). Remplacement par `clientSEC.setInsecure()` pour garantir une connexion SSL fonctionnelle sans maintenance de certificat.
-- **ArduinoJson v7 :** Correction du warning `containsKey` (déprécié). Remplacé par la syntaxe native v7 `doc["alerts"].is<JsonArray>()`.
+### Correctifs
+- **SSL/Telegram :** Passage à la méthode `clientSEC.setInsecure()` pour la connexion HTTPS Telegram. Élimine le besoin de maintenir un certificat racine (Root CA) à jour manuellement.
+- **Json :** Correction d'un warning sur `containsKey` remplacé par la syntaxe v7 `is<JsonArray>()`.
+
+## [1.9.2] - 2025-11-22
+### Correctifs
+- **Dépendance :** Migration vers la librairie `cotestatnt/AsyncTelegram2` (Fork maintenu et robuste).
+- **SSL :** Adaptation de l'initialisation du certificat SSL selon les requis de la nouvelle librairie.
+
+## [1.9.1] - 2025-11-22
+### Correctifs
+- **PlatformIO :** Correction d'une régression sur la bibliothèque graphique. Rétablissement de `Adafruit ST7735 and ST7789 Library` indispensable pour le contrôleur d'écran utilisé.
 
 ## [1.9.0] - 2025-11-22
 ### Architecture Logicielle
 - **Telegram :** Remplacement complet de la bibliothèque obsolète `UniversalTelegramBot` par **`AsyncTelegram2`**.
-    - **Avantages :** Compatibilité native ArduinoJson v7 (plus de warnings à la compilation), meilleure gestion SSL/TLS, empreinte mémoire optimisée.
-    - **Code :** Réécriture de la fonction `handleTelegram()` pour utiliser la logique non-bloquante de la nouvelle librairie.
+    - Gestion totalement asynchrone (non-bloquante).
+    - Compatibilité native avec ArduinoJson v7.
+    - Meilleure gestion des sessions SSL.
 
-### Nettoyage
-- **Dépendances :** Suppression des flags de suppression de warnings (`ARDUINOJSON_DEPRECATED_WARNINGS`) qui ne sont plus nécessaires.
+## [1.8.1] - 2025-11-22
+### Améliorations Données
+- **Qualité de l'Air (AQI) :** Découplage de la requête AQI. Le système tente désormais de récupérer la pollution via OpenWeatherMap même si la météo principale bascule sur le fournisseur de secours (Open-Meteo).
+- **Interface :** Affichage du nom complet du fournisseur de données ("OpenWeatherMap" ou "Open-Meteo") dans les pages de détails.
 
-## [1.8.1] - 2
-025-11-22
-### Corrections & Améliorations
-- **Provider Météo :** Affichage du nom complet du fournisseur de données ("OpenWeatherMap" ou "Open-Meteo") sur la page Système et Réseau.
-- **Qualité de l'Air (AQI) :**
-    - La requête AQI est désormais **découplée** de la requête météo principale.
-    - Le système tente de récupérer l'AQI via OpenWeatherMap (clé API) même si le fournisseur météo a basculé sur Open-Meteo (mode Hybride).
-    - Cela résout le problème où l'AQI restait à "N/A" en cas de bascule sur le secours.
-  
 ## [1.8.0] - 2025-11-22
-### Architecture de Données (Data Provider)
-- **OpenWeatherMap (OWM) :** Devient le fournisseur météo principal.
-    - Utilise l'API "One Call" pour récupérer : Météo Actuelle, Prévisions journalières, Alertes Météo.
-    - Utilise l'API "Air Pollution" pour récupérer l'indice AQI (Qualité de l'Air).
-- **Redondance (Failover) :** Si OWM échoue (timeout ou erreur), le système bascule automatiquement sur **Open-Meteo**.
-- **Conversion :** Ajout d'un convertisseur de codes météo (OWM ID vers WMO Code) pour assurer la compatibilité avec le moteur graphique.
+### Architecture de Données (Dual-Provider)
+- **OpenWeatherMap (OWM) :** Devient le fournisseur principal (API One Call). Apporte les alertes officielles et l'AQI.
+- **Failover (Secours) :** Bascule automatique et transparente vers **Open-Meteo** en cas d'échec de connexion ou de quota dépassé chez OWM.
+- **Compatibilité :** Création d'un convertisseur de codes météo (OWM ID vers WMO Code) pour unifier l'affichage graphique quelle que soit la source.
 
-### Interface
-- **Page 1 (Environnement) :** Ajout de l'affichage de l'AQI (Qualité de l'Air) avec code couleur (1=Bon/Vert à 5=Dangereux/Violet).
-- **Feedback :** L'indicateur de mise à jour affiche "OWM..." ou "OPM..." selon la source utilisée.
-  
 ## [1.7.0] - 2025-11-21
-### Performance & Stability
-- **Network (Anti-Freeze):** Added a **3000ms Timeout** on Weather HTTP requests.
-    - Prevents the UI from freezing indefinitely if the Open-Meteo server is slow or WiFi is unstable.
-- **Interface (Feedback):** Added an immediate "Updating..." visual indicator when the action button is pressed, before the network block.
-- **GPS:** Optimized the serial reading loop to clear the buffer more efficiently.
+### Performance & Stabilité
+- **Réseau (Anti-Freeze) :** Ajout d'un **Timeout de 3000ms** sur les requêtes HTTP. Empêche le blocage de l'interface si le serveur météo ne répond pas.
+- **UX :** Feedback visuel "MAJ..." immédiat lors de l'appui sur le bouton d'action.
+- **GPS :** Optimisation de la lecture du buffer série pour une acquisition plus rapide.
 
 ## [1.6.0] - 2025-11-21
-### System & Stability
-- **Inputs (Buttons):**
-    - Added a **software refractory period (300ms)** in the main loop.
-    - This eliminates page "double jumps" caused by mechanical button bounce or noise.
-- **System:** Added diagnostic functions (Uptime, Heap Memory).
+### Système & Stabilité
+- **Entrées (Boutons) :** Ajout d'une période réfractaire logicielle (Debounce 300ms) pour éliminer les doubles clics involontaires et les sauts de page.
+- **Page Système (Page 5) :** Nouvelle page de diagnostic exhaustive (Uptime, RAM libre, Fréquence CPU, RSSI dBm, État Alertes détaillé).
 
-### Interface (UI)
-- **Navigation:** The "System Status" page is moved to the very end of the cycle (Page 5).
-- **System Page (Page 5):** Completely redesigned to be comprehensive.
-    - Now displays: Uptime, Free RAM, CPU Frequency, precise WiFi RSSI, and Alert Status.
-    - Keeps the visual indicator (Green/Red Shield) but in a compact format to make room for data.
-    
 ## [1.5.0] - 2025-11-21
 ### Interface & UX
-- **Alerts Page (Page 3):**
-    - The page is now **always accessible** in the navigation, even without an alert.
-    - "Normal" State: Displays a Green Shield and "System Nominal".
-    - "Alert" State: Still displays the critical red screen and buzzer.
-    - The automatic pop-up when an alert is triggered is maintained.
-- **Boot Screen:**
-    - Added a **fluid animation**: Sun rays rotate around the logo during WiFi connection.
-    - Removed the static progress bar in favor of this cyclic animation.
-    
+- **Page Alertes :** Rendue accessible en permanence (Indicateur "Nominal" vert ou "Alerte" rouge). Affichage automatique (pop-up) conservé en cas de déclenchement critique.
+- **Boot Screen :** Nouvelle animation de démarrage avec rotation vectorielle des rayons du soleil pendant la recherche WiFi.
+
 ## [1.4.0] - 2025-11-21
-### User Experience (UX)
-- **Page Reorganization:** New, more logical navigation order:
-    1. Summary
-    2. Environment
-    3. Forecast
-    4. Alerts (Conditional)
-    5. GPS
-    6. Network
-- **Smart Alerts Page:**
-    - This page is **hidden** in normal navigation if no alert is active.
-    - It appears **automatically** and immediately as soon as an alert is detected.
+### Navigation
+- **Réorganisation :** Ordre des pages optimisé pour l'ergonomie (Résumé > Env > Prévisions > GPS > Réseau > Système/Alertes).
+- **Logique :** Gestion intelligente de l'affichage des alertes.
 
 ## [1.3.1] - 2025-11-21
-### Design & Graphics
-- **Graphics Engine:** Replaced static bitmaps with procedural **"Flat Design"**.
-- **Weather Icons:** Created 6 vector drawing functions for sharp and colorful icons:
-    - `drawSun` (Radiant sun)
-    - `drawCloud` (Volumetric clouds)
-    - `drawPartlyCloudy` (Sun hidden by cloud)
-    - `drawRain` (Cloud + Blue drops)
-    - `drawStorm` (Dark cloud + Yellow lightning)
-    - `drawSnow` (Cloud + White flakes)
-- **Logic:** Exhaustive mapping of Open-Meteo WMO codes to these new icons.
+### Design Graphique
+- **Moteur Vectoriel :** Remplacement des bitmaps statiques par un moteur de rendu géométrique ("Flat Design").
+- **Icônes :** Création de fonctions de dessin procédural pour : Soleil, Nuage, Eclaircies, Pluie, Orage, Neige, Brouillard.
 
 ## [1.3.0] - 2025-11-21
-### Audio & Visual
-- **Sound:** Completely rewritten `beep()` function.
-    - WiFi Connected: 2 fast beeps.
-    - GPS Fix: 3 fast beeps (triggered only once upon fix).
-    - Button Press: 1 short beep.
-    - Replaced `tone()` with non-blocking PWM logic for better compatibility with passive buzzers on S3.
-- **Graphics:** Introduced Bitmap Icons (`icons.h`) replacing colored circles.
-    - Main Screen: Large icon for current weather.
-    - Forecast Screen: Icons for each day (Sun, Cloud, Rain).
-    - Icons are tinted dynamically (Yellow for sun, Grey for cloud, Blue for rain).
+### Audio
+- **Son :** Réécriture de la fonction `beep()` utilisant le PWM non-bloquant pour assurer l'audibilité des notifications (WiFi Connecté, GPS Fix, Boutons).
 
 ## [1.2.0] - 2025-11-21
-### Added
-- **Page 5 (Forecast):** Added a 3-day weather forecast page (Max/Min temps, Weather Icons).
-- **API:** Extended Open-Meteo request to fetch daily forecast data (`daily`).
-- **Code:** Added `getWeatherColor()` helper function for reusable icon color logic.
+### Fonctionnalités
+- **Page Prévisions :** Ajout d'une page dédiée aux prévisions sur 3 jours (J+1, J+2, J+3) avec icônes et températures Min/Max.
+- **API :** Extension des requêtes pour récupérer les données journalières (`daily`).
 
 ## [1.1.5] - 2025-11-21
-### Improved
-- **UI/UX:** Complete redesign of the Startup Screen with a graphical logo and progress bar.
-- **Sensors:** Dynamic Barometric Altitude calibration using Sea Level Pressure (QNH) provided by the Open-Meteo API for more accurate readings.
-- **GPS:** Added a visual "SIMULATION" tag on the GPS page when the module has no fix (to prevent confusion with default coordinates).
+### Capteurs & UX
+- **Altimètre :** Calibration dynamique de l'altitude basée sur la pression niveau mer (QNH) locale récupérée via API. Corrige les erreurs d'altitude.
+- **GPS :** Ajout du tag "SIMULATION" sur l'écran GPS lorsque les coordonnées par défaut sont utilisées.
+- **Boot :** Premier design graphique de l'écran de démarrage.
 
 ## [1.1.4] - 2025-11-21
-### Changed
-- **Core:** Migrated to **ArduinoJson v7**. The code was refactored to use the modern API syntax of this library.
-
-## [1.1.3] - 2025-11-21
-### Improved
-- **UI/UX:** Displayed NTP time in the main screen header.
+### Modernisation
+- **Noyau :** Migration complète vers **ArduinoJson v7**. Refactorisation du code pour utiliser la nouvelle syntaxe JSON (allocation dynamique automatique).
 
 ## [1.1.2] - 2025-11-21
-### Fixed
-- **GPS:** Fixed initialization of default coordinates to ensure API requests are always valid before a GPS Fix is obtained.
+### Correctifs
+- **GPS :** Correction des coordonnées par défaut (Bordeaux) pour éviter des données météo erronées (26°C) au démarrage avant le Fix GPS.
 
 ## [1.1.1] - 2025-11-21
-### Fixed
-- **Inputs:** Switched buttons to **Interrupts (ISR)** for non-blocking handling and instant UI responsiveness.
-- **Hardware:** Added I2C address checking and initialization logic for the BMP280 sensor (supports both 0x76 and 0x77).
+### Matériel
+- **Boutons :** Passage à la gestion par **Interruptions (ISR)** pour une réactivité immédiate.
+- **Capteurs :** Ajout d'un scanner d'adresses I2C pour le BMP280 (support 0x76/0x77).
 
 ## [1.1.0] - 2025-11-21
-### Added
-- **Interface:** Added pages 1 through 4 to organize data (Details, Alerts, GPS, Network).
-- **Feature:** Implemented **Telegram Bot** support for remote control and status.
-- **Feature:** Web Server and JSON API (`/api/data`) implemented.
+### Fonctionnalités
+- **Pages :** Ajout des pages de détails (Alertes, GPS, Réseau).
+- **Connectivité :** Activation du Bot Telegram et du Serveur Web.
 
 ## [1.0.0] - 2025-11-21
-- Initial project release.
+### Version Initiale
+- Lancement du projet. Support ESP32-S3, Écran ST7789, GPS GT-U7, Capteurs AHT20+BMP280, WiFi Multi.

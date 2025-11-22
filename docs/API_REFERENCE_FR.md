@@ -1,3 +1,5 @@
+# Dernière version : **v2.5.0** — Retour à la stabilité. OTA (`ElegantOTA`) supprimée ; les bibliothèques réseau sont revenues à des versions stables.
+
 # Référence API
 
 ## API JSON Locale

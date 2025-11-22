@@ -1,5 +1,7 @@
 # Project Architecture
 
+Latest release: **v2.5.0** — Rollback to stable build. OTA (`ElegantOTA`) removed; using stable network forks (`mathieucarbou` / esphome stable versions).
+
 This document provides an overview of the software architecture of the Meteo Station.
 
 ## Core Concepts

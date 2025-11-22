@@ -1,3 +1,5 @@
+# Latest release: **v2.5.0** — Rollback to stable build. OTA (`ElegantOTA`) removed; network libraries reverted to stable versions.
+
 # API Reference
 
 ## Local JSON API

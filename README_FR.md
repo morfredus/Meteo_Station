@@ -1,6 +1,8 @@
 # Station Météo ESP32 (Projet Meteo_Station)
 
-**Version Actuelle : 1.7.0** (au 2025-11-21)
+**Version Actuelle : 2.5.0** (au 2025-11-22)
+
+Note : v2.5.0 est un retour à la stabilité — la mise à jour OTA (`ElegantOTA`) a été supprimée à cause de conflits de dépendances ; les bibliothèques réseau sont revenues à des versions stables.
 
 ## 📖 À propos du projet
 

@@ -1,6 +1,8 @@
 # ESP32 Weather Station (Meteo_Station Project)
 
-**Current Version: 1.7.0** (as of 2025-11-21)
+**Current Version: 2.5.0** (as of 2025-11-22)
+
+Note: v2.5.0 is a stability rollback — OTA (`ElegantOTA`) was removed due to dependency conflicts; network libraries reverted to stable versions.
 
 ## 📖 About This Project
 

@@ -1,5 +1,7 @@
 # Architecture du Projet
 
+Dernière version : **v2.5.0** — Retour à la stabilité. OTA (`ElegantOTA`) supprimée ; utilisation des forks réseau stables (`mathieucarbou` / versions stables précédentes).
+
 Ce document donne un aperçu de l'architecture logicielle de la station météo.
 
 ## Concepts Clés
