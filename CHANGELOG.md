@@ -2,6 +2,13 @@
 
 All notable changes to this project are documented in this file.
 
+## [2.6.0] - 2025-11-22
+### Major Improvement (Reliability)
+- **AQI Provider:** Switched the air-quality data source to **Open‑Meteo Air Quality API**.
+    - **Before:** OpenWeatherMap (required API key and produced intermittent "N/A" results).
+    - **Now:** Open‑Meteo Air Quality (free, no API key required, CAMS‑based data).
+    - **Benefit:** More reliable AQI values and automatic conversion to the station's 1–5 display scale.
+
 ## [2.5.0] - 2025-11-22
 ### Return to Stability (Rollback)
 - **OTA Removal:** Full removal of the over-the-air update feature (`ElegantOTA`) which caused unsolvable dependency conflicts with the web server.

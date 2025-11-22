@@ -1,4 +1,4 @@
-# Dernière version : **v2.5.0** — Retour à la stabilité. OTA (`ElegantOTA`) supprimée ; les bibliothèques réseau sont revenues à des versions stables.
+# Dernière version : **v2.6.0** — Fournisseur AQI changé vers Open‑Meteo Air Quality (gratuit, sans clé API).
 
 # Référence API
 
@@ -30,4 +30,5 @@ L'objet JSON contient les lectures des capteurs et l'état du système.
 
 ## APIs Externes
 
-- **Open-Meteo :** Utilisée pour récupérer les données de prévisions météo. La requête inclut désormais le paramètre `daily` pour obtenir les prévisions sur 3 jours.
+- **Open-Meteo (météo) :** Utilisée pour récupérer les données de prévisions météo. La requête inclut le paramètre `daily` pour obtenir les prévisions sur 3 jours.
+- **Open‑Meteo Air Quality :** Utilisée désormais comme fournisseur AQI principal (sans clé API). L'indice AQI est converti sur l'échelle 1–5 utilisée par la station.

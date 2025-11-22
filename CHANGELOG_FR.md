@@ -1,5 +1,20 @@
 # Historique des Versions (Changelog)
 
+## [2.6.0] - 2025-11-22
+### Amélioration Majeure (Fiabilité)
+- **Qualité de l'Air (AQI) :** Remplacement total du fournisseur de données.
+    - **Avant :** OpenWeatherMap (Nécessitait une clé API, causait souvent des erreurs "N/A").
+    - **Maintenant :** **Open-Meteo Air Quality API**.
+    - **Avantage :** Gratuit, sans clé API, données basées sur le modèle Européen CAMS.
+- **Logique :** Conversion automatique de l'indice CAQI (0-100) fourni par Open-Meteo vers l'échelle simple (1-5) utilisée par l'affichage de la station.
+
+## [2.5.2] - 2025-11-22
+### Correctifs (Patch)
+- **Débogage :** Ajout de traces séries (`Serial.print`) détaillées pour diagnostiquer les échecs de requêtes AQI (OpenWeather) et la lecture du capteur de lumière.
+- **Matériel (Hotfix) :** Changement de la broche par défaut du capteur de lumière (LDR) de `9` à `4` dans `config.h`.
+    - *Raison :* La GPIO 9 est souvent utilisée par le Flash interne sur les modules ESP32-S3, rendant la lecture analogique impossible (lecture à 0V constant).
+- **Cosmétique :** Clarification de l'unité "lx" (Lux) sur l'affichage, souvent confondue avec "1x".
+
 ## [2.5.1] - 2025-11-22
 ### Correctifs (Hotfix)
 - **Compilation :** Ajout de la fonction manquante `drawTrendArrow()` dans `weather_graphics.h`.

@@ -1,3 +1,5 @@
+# Dernière version : **v2.6.0** — Fournisseur AQI changé vers Open‑Meteo Air Quality (gratuit, sans clé API).
+
 # Foire Aux Questions (FAQ)
 
 **Q : L'interface se bloque parfois pendant la mise à jour de la météo. Pourquoi ?**

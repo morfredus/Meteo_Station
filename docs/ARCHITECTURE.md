@@ -1,6 +1,6 @@
 # Project Architecture
 
-Latest release: **v2.5.0** — Rollback to stable build. OTA (`ElegantOTA`) removed; using stable network forks (`mathieucarbou` / esphome stable versions).
+Latest release: **v2.6.0** — AQI provider switched to Open‑Meteo Air Quality API (free, no API key). The project continues using the stable network forks.
 
 This document provides an overview of the software architecture of the Meteo Station.
 

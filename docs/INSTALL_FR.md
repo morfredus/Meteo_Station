@@ -1,3 +1,5 @@
+# Dernière version : **v2.6.0** — Fournisseur AQI changé vers Open‑Meteo Air Quality (gratuit, sans clé API).
+
 # Guide d'Installation
 
 Ce document décrit comment mettre en place l'environnement du projet.

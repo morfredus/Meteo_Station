@@ -1,3 +1,5 @@
+# Latest release: **v2.6.0** — AQI provider switched to Open‑Meteo Air Quality API (free, no API key).
+
 # Frequently Asked Questions (FAQ)
 
 **Q: The interface sometimes freezes during a weather update. Why?**

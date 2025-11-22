@@ -1,4 +1,4 @@
-# Dernière version : **v2.5.0** — Retour à la stabilité. OTA (`ElegantOTA`) supprimée ; les bibliothèques réseau sont revenues à des versions stables.
+# Dernière version : **v2.6.0** — Fournisseur AQI changé vers Open‑Meteo Air Quality (gratuit, sans clé API).
 
 # Compilation & Déploiement
 

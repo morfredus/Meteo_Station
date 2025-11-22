@@ -1,13 +1,11 @@
-# Release v2.5.0 — Short Notes
+# Release v2.6.0 — Short Notes
 
 ## English summary
 
-v2.5.0 — Rollback to stability (OTA removed)
+v2.6.0 — Reliability improvement (AQI provider change)
 
-- Removed over-the-air update feature (`ElegantOTA`) due to unsolvable dependency conflicts with the async web server.
-- Reverted/locked network libraries to stable versions to restore reliable builds (`ESPAsyncWebServer` / `AsyncTCP` forks).
-- Documentation updated (changelog, READMEs, docs/*).
-- Added PlatformIO cache-clean instructions to `docs/BUILD_AND_DEPLOY.md` (PowerShell + bash).
+- Switched the air-quality data provider to **Open‑Meteo Air Quality API** (free, no API key required) to improve AQI reliability.
+- Documentation updated across repository to reflect v2.6.0.
 
 ## Instructions (short)
 
@@ -29,19 +27,16 @@ platformio run
 ```
 
 ## Notes
-- OTA endpoint (`/update`) is removed in this release.
-- Tag: `v2.5.0` (already created and pushed).
+- AQI provider changed to Open‑Meteo Air Quality API; no OTA-related changes in this release.
 
 ---
 
 ## Résumé (Français)
 
-v2.5.0 — Retour à la stabilité (OTA supprimée)
+v2.6.0 — Amélioration de la fiabilité (changement du fournisseur AQI)
 
-- Suppression de la mise à jour OTA (`ElegantOTA`) en raison de conflits de dépendances avec le serveur web asynchrone.
-- Restauration / verrouillage des bibliothèques réseau vers des versions stables.
-- Documentation mise à jour (`CHANGELOG.md`, `README.md`, `docs/*`).
-- Ajout d'instructions de nettoyage du cache PlatformIO dans `docs/BUILD_AND_DEPLOY_FR.md`.
+- Changement du fournisseur de qualité de l'air vers **Open‑Meteo Air Quality API** (gratuit, sans clé API) pour améliorer la fiabilité des valeurs AQI.
+- Documentation mise à jour dans le dépôt pour refléter v2.6.0.
 
 ## Instructions (court)
 

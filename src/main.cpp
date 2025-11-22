@@ -97,7 +97,7 @@ void updatePressureTrend(float currentPres);
 void fetchWeather();          
 bool fetchOpenWeatherMap();   
 bool fetchOpenMeteo();        
-bool fetchAQI_OWM();          
+bool fetchAQI_OpenMeteo(); // MODIFIÉ : Source Open-Meteo
 int mapOWMtoWMO(int owmId);   
 void handleTelegram(); 
 void refreshDisplayData();
@@ -114,6 +114,8 @@ void showToastMessage(String msg, uint16_t color);
 void setup() {
   Serial.begin(115200);
   Serial2.begin(GPS_BAUD_RATE, SERIAL_8N1, PIN_GPS_RXD, PIN_GPS_TXD);
+  
+  Serial.println("\n--- BOOTING STATION v" + String(PROJECT_VERSION) + " ---");
 
   pinMode(PIN_BUTTON_PAGE, INPUT_PULLUP);
   pinMode(PIN_BUTTON_ACTION, INPUT_PULLUP);
@@ -134,7 +136,9 @@ void setup() {
   ledcAttachPin(TFT_BL, BACKLIGHT_LEDC_CHANNEL);
   ledcWrite(BACKLIGHT_LEDC_CHANNEL, 255);
 
+  // Config LDR (GPIO 4 pour ESP32-S3 recommandé)
   pinMode(PIN_LIGHT_SENSOR, INPUT);
+  Serial.printf("LDR configure sur PIN: %d\n", PIN_LIGHT_SENSOR);
 
   pixels.begin();
   pixels.setBrightness(NEOPIXEL_BRIGHTNESS);
@@ -272,8 +276,7 @@ String cleanText(String s) {
 
 void adjustBrightness() {
     if (autoBrightnessMode) {
-        int luxRaw = analogRead(PIN_LIGHT_SENSOR);
-        int pwmVal = map(luxRaw, 0, 4095, 10, 255);
+        int pwmVal = map(localSensor.lux, 0, 4095, 10, 255);
         if (pwmVal < 10) pwmVal = 10;
         if (pwmVal > 255) pwmVal = 255;
         ledcWrite(BACKLIGHT_LEDC_CHANNEL, pwmVal);
@@ -320,7 +323,7 @@ void handleTelegram() {
       String text = msg.text;
       if (text.equalsIgnoreCase("/start")) bot.sendMessage(msg, "Station v" + String(PROJECT_VERSION) + "\n/status");
       else if (text.equalsIgnoreCase("/status")) {
-          String s = "🌡 Int: " + String(localSensor.temp) + "C\n🌍 Ext: " + String(apiWeather.temp) + "C\nAQI: " + String(apiWeather.aqi);
+          String s = "🌡 Int: " + String(localSensor.temp) + "C\n🌍 Ext: " + String(apiWeather.temp) + "C\nAQI: " + String(apiWeather.aqi) + "\nLux: " + String(localSensor.lux);
           bot.sendMessage(msg, s);
       }
       else if (text.equalsIgnoreCase("/reboot")) ESP.restart();
@@ -364,13 +367,19 @@ void fetchWeather() {
     tft.fillRect(210, 5, 20, 20, C_BLUE); 
     tft.setCursor(215, 5); tft.setTextColor(C_YELLOW); tft.setTextSize(1); tft.print("DL");
 
+    Serial.println("--- Fetching Weather ---");
     bool successOWM = fetchOpenWeatherMap();
     if (successOWM) apiWeather.provider = "OpenWeatherMap";
     else {
+        Serial.println("OWM Failed, Trying OpenMeteo...");
         if (fetchOpenMeteo()) apiWeather.provider = "Open-Meteo";
         else apiWeather.provider = "Erreur Reseau";
     }
-    fetchAQI_OWM(); 
+    
+    // APPEL DE LA NOUVELLE FONCTION AQI (OPEN METEO)
+    Serial.println("--- Fetching AQI (Open-Meteo) ---");
+    fetchAQI_OpenMeteo(); 
+    
     tft.fillRect(210, 5, 20, 20, C_BLUE);
 }
 
@@ -380,7 +389,8 @@ bool fetchOpenWeatherMap() {
                  String(currentGPS.lat, 4) + "&lon=" + String(currentGPS.lon, 4) + 
                  "&exclude=minutely,hourly&units=metric&appid=" + OPENWEATHER_API_KEY;
     http.begin(url);
-    if (http.GET() == 200) {
+    int code = http.GET();
+    if (code == 200) {
         JsonDocument doc;
         if (!deserializeJson(doc, http.getString())) {
             apiWeather.temp = doc["current"]["temp"];
@@ -424,19 +434,40 @@ bool fetchOpenMeteo() {
     http.end(); return false;
 }
 
-bool fetchAQI_OWM() {
-    WiFiClientSecure clientAQI;
-    clientAQI.setInsecure(); 
+// === NOUVELLE FONCTION : AQI VIA OPEN-METEO (GRATUIT) ===
+bool fetchAQI_OpenMeteo() {
     HTTPClient http; http.setTimeout(3000);
-    String url = String("https://api.openweathermap.org/data/2.5/air_pollution?lat=") + 
-                 String(currentGPS.lat, 4) + "&lon=" + String(currentGPS.lon, 4) + 
-                 "&appid=" + OPENWEATHER_API_KEY;
-    http.begin(clientAQI, url); 
+    
+    // Verification coordonnees
+    float latToUse = currentGPS.isValid ? currentGPS.lat : 44.8378;
+    float lonToUse = currentGPS.isValid ? currentGPS.lon : -0.5792;
+
+    // URL Open-Meteo Air Quality (Indice Europeen CAQI)
+    String url = String("https://air-quality-api.open-meteo.com/v1/air-quality?latitude=") + 
+                 String(latToUse, 4) + "&longitude=" + String(lonToUse, 4) + 
+                 "&current=european_aqi";
+                 
+    Serial.print("AQI Req: "); Serial.println(url);
+
+    http.begin(url); 
     int code = http.GET();
+    
     if(code == 200) {
         JsonDocument doc;
-        if(!deserializeJson(doc, http.getString())) {
-            apiWeather.aqi = doc["list"][0]["main"]["aqi"];
+        DeserializationError error = deserializeJson(doc, http.getString());
+        if(!error) {
+            int rawAqi = doc["current"]["european_aqi"]; // Echelle 0-100+
+            Serial.printf("Raw CAQI: %d\n", rawAqi);
+            
+            // Conversion échelle CAQI (0-100) vers Echelle 1-5 de votre affichage
+            // 1=Bon, 2=Moyen, 3=Degrade, 4=Mauvais, 5=Dangereux
+            if (rawAqi < 20) apiWeather.aqi = 1;
+            else if (rawAqi < 40) apiWeather.aqi = 2;
+            else if (rawAqi < 60) apiWeather.aqi = 3;
+            else if (rawAqi < 80) apiWeather.aqi = 4;
+            else apiWeather.aqi = 5;
+
+            Serial.printf("Mapped AQI (1-5): %d\n", apiWeather.aqi);
             http.end(); return true;
         }
     }
@@ -511,7 +542,11 @@ void updateSensors() {
   float p = bmp.readPressure();
   if (!isnan(p) && p > 0) localSensor.pres = p / 100.0F;
   updatePressureTrend(localSensor.pres);
-  localSensor.lux = analogRead(PIN_LIGHT_SENSOR);
+  
+  // LDR DEBUG
+  int rawLux = analogRead(PIN_LIGHT_SENSOR);
+  Serial.printf("LDR Raw Pin %d: %d\n", PIN_LIGHT_SENSOR, rawLux);
+  localSensor.lux = rawLux;
 
   if (localSensor.temp > ALERT_TEMP_HIGH) { alertActive = true; alertMessage = "Temp HAUTE"; }
   else if (localSensor.temp < ALERT_TEMP_LOW) { alertActive = true; alertMessage = "Temp BASSE"; }
