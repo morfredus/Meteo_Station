@@ -1,5 +1,11 @@
 # Historique des Versions (Changelog)
 
+## [2.6.1] - 2025-11-23
+### Correctif : Telegram & UX
+- **Telegram :** Envoi au démarrage d'un message détaillé (météo, prévisions, AQI, capteurs, GPS, état système).
+- **Commandes Telegram :** Ajout de `/help`, `/weather`, `/system`, `/gps`, `/alerts` et amélioration de `/status`.
+- **Sécurité :** Le bot ne répond qu'au `TELEGRAM_CHAT_ID` configuré.
+
 ## [2.6.0] - 2025-11-22
 ### Amélioration Majeure (Fiabilité)
 - **Qualité de l'Air (AQI) :** Remplacement total du fournisseur de données.

@@ -2,6 +2,13 @@
 
 All notable changes to this project are documented in this file.
 
+## [2.6.1] - 2025-11-23
+### Patch: Telegram & UX
+- **Telegram:** Send a detailed full status message at startup (weather, forecast, AQI, sensors, GPS, system).
+- **Telegram Commands:** Added `/help`, `/weather`, `/system`, `/gps`, `/alerts` and improved `/status` output.
+- **Diagnostics:** Ensures the bot only responds to the configured `TELEGRAM_CHAT_ID` and reports provider/uptime.
+
+
 ## [2.6.0] - 2025-11-22
 ### Major Improvement (Reliability)
 - **AQI Provider:** Switched the air-quality data source to **Open‑Meteo Air Quality API**.

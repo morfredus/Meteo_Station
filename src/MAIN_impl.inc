@@ -1,269 +1,3 @@
-#include <Arduino.h>
-#include <WiFi.h>
-#include <WiFiMulti.h>
-#include <WiFiClientSecure.h>
-#include <HTTPClient.h>
-#include <AsyncTCP.h>
-#include <ESPAsyncWebServer.h>
-#include <ArduinoJson.h>
-#include <AsyncTelegram2.h>
-#include <Adafruit_GFX.h>
-#include <Adafruit_ST7789.h> 
-#include <Adafruit_AHTX0.h>
-#include <Adafruit_BMP280.h>
-#include <Adafruit_NeoPixel.h>
-#include <TinyGPSPlus.h>
-#include <time.h>
-
-#include "config.h"
-#include "web_page.h"
-#include "weather_graphics.h"
-
-// ================= OBJETS GLOBAUX =================
-WiFiMulti wifiMulti;
-AsyncWebServer server(80);
-WiFiClientSecure clientSEC;
-AsyncTelegram2 bot(clientSEC);
-
-Adafruit_ST7789 tft = Adafruit_ST7789(TFT_CS, TFT_DC, TFT_RST);
-Adafruit_AHTX0 aht;
-Adafruit_BMP280 bmp;
-Adafruit_NeoPixel pixels(NEOPIXEL_NUM_PIXELS, PIN_NEOPIXEL, NEO_GRB + NEO_KHZ800);
-TinyGPSPlus gps;
-
-// ================= VARIABLES D'ETAT =================
-struct SensorData {
-  float temp = 0.0;
-  float hum = 0.0;
-  float pres = 0.0;
-  int lux = 0;
-  String trend = "→";
-} localSensor;
-
-float pressureHistory = 0.0;
-unsigned long lastPressureTime = 0;
-bool autoBrightnessMode = true; 
-
-struct WeatherData {
-  float temp = 0.0;
-  int weatherCode = 0;
-  float pressureMSL = 1013.25;
-  int aqi = 0; 
-  float forecastMax[3] = {0,0,0};
-  float forecastMin[3] = {0,0,0};
-  int forecastCode[3] = {0,0,0};
-  String provider = "Recherche..."; 
-} apiWeather;
-
-struct GPSData {
-  double lat = 44.8378;
-  double lon = -0.5792; 
-  double alt = 0.0;
-  double speed = 0.0;
-  double course = 0.0;
-  bool isValid = false;
-  int sats = 0;
-  String date = "--/--/--";
-  String time = "--:--:--";
-} currentGPS;
-
-bool alertActive = false;
-bool lastAlertActive = false; 
-String alertMessage = "Aucune";
-bool gpsFixNotified = false;
-
-int currentPage = 0;
-const int TOTAL_PAGES = 6; 
-
-unsigned long lastTimeSensor = 0;
-unsigned long lastTimeWeather = 0;
-unsigned long lastDisplayUpdate = 0;
-
-// ================= INTERRUPTIONS =================
-volatile bool flagPagePressed = false;
-volatile bool flagActionPressed = false;
-unsigned long lastButtonActionTime = 0; 
-const unsigned long REFRACTORY_PERIOD = 300; 
-
-void IRAM_ATTR isrPageBtn() { flagPagePressed = true; }
-void IRAM_ATTR isrActionBtn() { flagActionPressed = true; }
-
-// ================= PROTOTYPES =================
-void drawStartupScreen(); 
-void initSensors();
-void updateSensors();
-void adjustBrightness();
-void updatePressureTrend(float currentPres);
-void fetchWeather();          
-bool fetchOpenWeatherMap();   
-bool fetchOpenMeteo();        
-bool fetchAQI_OpenMeteo(); // MODIFIÉ : Source Open-Meteo
-int mapOWMtoWMO(int owmId);   
-void handleTelegram(); 
-void sendTelegramFullStatus(unsigned long chatId);
-void refreshDisplayData();
-void drawFullPage();
-void beep(int count, int duration);
-void setNeoPixelStatus();
-void handleButtonLogic();
-void drawSunRays(int cx, int cy, int offsetAngle, uint16_t color);
-String getUptime();
-String cleanText(String s);
-void showToastMessage(String msg, uint16_t color);
-
-// ================= SETUP =================
-void setup() {
-  Serial.begin(115200);
-  Serial2.begin(GPS_BAUD_RATE, SERIAL_8N1, PIN_GPS_RXD, PIN_GPS_TXD);
-  
-  Serial.println("\n--- BOOTING STATION v" + String(PROJECT_VERSION) + " ---");
-
-  pinMode(PIN_BUTTON_PAGE, INPUT_PULLUP);
-  pinMode(PIN_BUTTON_ACTION, INPUT_PULLUP);
-  attachInterrupt(digitalPinToInterrupt(PIN_BUTTON_PAGE), isrPageBtn, FALLING);
-  attachInterrupt(digitalPinToInterrupt(PIN_BUTTON_ACTION), isrActionBtn, FALLING);
-
-  pinMode(PIN_BUZZER, OUTPUT);
-  #ifndef BUZZER_LEDC_CHANNEL
-    #define BUZZER_LEDC_CHANNEL 0
-  #endif
-  ledcSetup(BUZZER_LEDC_CHANNEL, 2000, 8);
-  ledcAttachPin(PIN_BUZZER, BUZZER_LEDC_CHANNEL);
-
-  #ifndef BACKLIGHT_LEDC_CHANNEL
-    #define BACKLIGHT_LEDC_CHANNEL 1 
-  #endif
-  ledcSetup(BACKLIGHT_LEDC_CHANNEL, 12000, 8);
-  ledcAttachPin(TFT_BL, BACKLIGHT_LEDC_CHANNEL);
-  ledcWrite(BACKLIGHT_LEDC_CHANNEL, 255);
-
-  // Config LDR (GPIO 4 pour ESP32-S3 recommandé)
-  pinMode(PIN_LIGHT_SENSOR, INPUT);
-  Serial.printf("LDR configure sur PIN: %d\n", PIN_LIGHT_SENSOR);
-
-  pixels.begin();
-  pixels.setBrightness(NEOPIXEL_BRIGHTNESS);
-  pixels.show();
-
-  Wire.begin(PIN_I2C_SDA, PIN_I2C_SCL);
-  
-  tft.init(TFT_WIDTH, TFT_HEIGHT);
-  tft.setRotation(TFT_ROTATION);
-  tft.fillScreen(C_BLACK);
-  
-  drawStartupScreen(); 
-  initSensors();
-
-  configTime(3600, 3600, "pool.ntp.org");
-
-  clientSEC.setInsecure(); 
-  bot.setUpdateTime(2000); 
-  bot.setTelegramToken(TELEGRAM_BOT_TOKEN);
-  
-  if (bot.begin()) {
-      unsigned long chat = atol(TELEGRAM_CHAT_ID);
-      bot.sendTo(chat, "Station v" + String(PROJECT_VERSION) + " Ready.");
-      // Send detailed full status at startup
-      sendTelegramFullStatus(chat);
-  }
-  
-  server.on("/", HTTP_GET, [](AsyncWebServerRequest *request){
-    request->send_P(200, "text/html", index_html);
-  });
-  
-  server.on("/api/data", HTTP_GET, [](AsyncWebServerRequest *request){
-    JsonDocument doc; 
-    doc["sensor"]["temp"] = localSensor.temp;
-    doc["sensor"]["hum"] = localSensor.hum;
-    doc["sensor"]["pres"] = localSensor.pres;
-    doc["sensor"]["lux"] = localSensor.lux;
-    doc["sensor"]["trend"] = localSensor.trend;
-    doc["weather"]["temp"] = apiWeather.temp;
-    doc["weather"]["code"] = apiWeather.weatherCode;
-    doc["weather"]["aqi"] = apiWeather.aqi;
-    doc["weather"]["provider"] = apiWeather.provider;
-    
-    JsonArray f = doc["forecast"].to<JsonArray>();
-    for(int i=0; i<3; i++) {
-        JsonObject day = f.add<JsonObject>();
-        day["min"] = apiWeather.forecastMin[i];
-        day["max"] = apiWeather.forecastMax[i];
-    }
-    
-    doc["gps"]["lat"] = currentGPS.lat;
-    doc["gps"]["lon"] = currentGPS.lon;
-    doc["gps"]["valid"] = currentGPS.isValid;
-    doc["gps"]["sats"] = currentGPS.sats;
-    doc["sys"]["uptime"] = getUptime();
-    doc["sys"]["backlight"] = autoBrightnessMode ? "Auto" : "Max";
-    doc["alert"] = alertActive;
-    
-    String response; serializeJson(doc, response);
-    request->send(200, "application/json", response);
-  });
-  
-  server.begin();
-
-  fetchWeather();
-  updateSensors();
-  
-  tft.fillScreen(C_BLACK);
-  drawFullPage();
-}
-
-// ================= LOOP =================
-void loop() {
-  unsigned long now = millis();
-
-  while (Serial2.available() > 0) {
-    gps.encode(Serial2.read());
-  }
-
-  if (gps.location.isUpdated()) {
-    currentGPS.lat = gps.location.lat();
-    currentGPS.lon = gps.location.lng();
-    currentGPS.alt = gps.altitude.meters();
-    currentGPS.speed = gps.speed.kmph();
-    currentGPS.course = gps.course.deg();
-    currentGPS.sats = gps.satellites.value();
-    currentGPS.isValid = true;
-    
-    if (!gpsFixNotified && currentGPS.isValid) {
-        beep(3, 80); 
-        gpsFixNotified = true;
-    }
-    char buffDate[12]; sprintf(buffDate, "%02d/%02d/%02d", gps.date.day(), gps.date.month(), gps.date.year());
-    currentGPS.date = String(buffDate);
-    char buffTime[10]; sprintf(buffTime, "%02d:%02d:%02d", gps.time.hour(), gps.time.minute(), gps.time.second());
-    currentGPS.time = String(buffTime);
-  }
-
-  handleButtonLogic();
-
-  if (now - lastTimeSensor > INTERVAL_SENSORS) {
-    updateSensors();
-    adjustBrightness();
-    setNeoPixelStatus();
-    refreshDisplayData();
-    lastTimeSensor = now;
-  }
-
-  if (now - lastTimeWeather > INTERVAL_WEATHER) {
-    fetchWeather();
-    refreshDisplayData();
-    lastTimeWeather = now;
-  }
-
-  handleTelegram(); 
-
-  if (now - lastDisplayUpdate > 1000) {
-    refreshDisplayData();
-    lastDisplayUpdate = now;
-  }
-}
-
-// ================= LOGIQUE METIER =================
-
 String cleanText(String s) {
     s.replace("é", "e"); s.replace("è", "e"); s.replace("ê", "e"); s.replace("ë", "e");
     s.replace("à", "a"); s.replace("â", "a");
@@ -320,120 +54,106 @@ void showToastMessage(String msg, uint16_t color) {
     drawFullPage(); refreshDisplayData();
 }
 
-void handleTelegram() {
-  TBMessage msg;
-  if (bot.getNewMessage(msg)) {
-      if (String(msg.chatId) != TELEGRAM_CHAT_ID) return;
-      String text = msg.text;
-      if (text.equalsIgnoreCase("/start")) bot.sendMessage(msg, "Station v" + String(PROJECT_VERSION) + "\n/status");
-      else if (text.equalsIgnoreCase("/status")) {
-          String s = "🌡 Int: " + String(localSensor.temp) + "C\n🌍 Ext: " + String(apiWeather.temp) + "C\nAQI: " + String(apiWeather.aqi) + "\nLux: " + String(localSensor.lux);
-          bot.sendMessage(msg, s);
-      }
-      else if (text.equalsIgnoreCase("/reboot")) ESP.restart();
-  }
-}
-
 // Send a complete formatted status to a chat id
 void sendTelegramFullStatus(unsigned long chatId) {
-  String msg = "Station Meteo - Status v" + String(PROJECT_VERSION) + "\n\n";
-  msg += "-- Sensors (local) --\n";
-  msg += "Temp: " + String(localSensor.temp, 1) + " C\n";
-  msg += "Hum: " + String(localSensor.hum, 0) + " %\n";
-  if (isnan(localSensor.pres)) msg += "Pres: N/A\n";
-  else msg += "Pres: " + String(localSensor.pres, 0) + " hPa\n";
-  msg += "Lux: " + String(localSensor.lux) + " lx\n";
-  msg += "Trend: " + localSensor.trend + "\n\n";
+    String msg = "Station Meteo - Status v" + String(PROJECT_VERSION) + "\n\n";
+    msg += "-- Sensors (local) --\n";
+    msg += "Temp: " + String(localSensor.temp, 1) + " C\n";
+    msg += "Hum: " + String(localSensor.hum, 0) + " %\n";
+    if (isnan(localSensor.pres)) msg += "Pres: N/A\n";
+    else msg += "Pres: " + String(localSensor.pres, 0) + " hPa\n";
+    msg += "Lux: " + String(localSensor.lux) + " lx\n";
+    msg += "Trend: " + localSensor.trend + "\n\n";
 
-  msg += "-- Weather (api) --\n";
-  msg += "Outside Temp: " + String(apiWeather.temp, 1) + " C\n";
-  msg += "Weather Code: " + String(apiWeather.weatherCode) + "\n";
-  msg += "AQI (1-5): " + String(apiWeather.aqi) + "\n";
-  msg += "Provider: " + apiWeather.provider + "\n\n";
+    msg += "-- Weather (api) --\n";
+    msg += "Outside Temp: " + String(apiWeather.temp, 1) + " C\n";
+    msg += "Weather Code: " + String(apiWeather.weatherCode) + "\n";
+    msg += "AQI (1-5): " + String(apiWeather.aqi) + "\n";
+    msg += "Provider: " + apiWeather.provider + "\n\n";
 
-  msg += "-- Forecast (3 days) --\n";
-  for (int i = 0; i < 3; i++) {
-    msg += "Day " + String(i+1) + ": ";
-    msg += "Min " + String(apiWeather.forecastMin[i], 0) + "C ";
-    msg += "Max " + String(apiWeather.forecastMax[i], 0) + "C ";
-    msg += "Code " + String(apiWeather.forecastCode[i]) + "\n";
-  }
-  msg += "\n";
+    msg += "-- Forecast (3 days) --\n";
+    for (int i = 0; i < 3; i++) {
+        msg += "Day " + String(i+1) + ": ";
+        msg += "Min " + String(apiWeather.forecastMin[i], 0) + "C ";
+        msg += "Max " + String(apiWeather.forecastMax[i], 0) + "C ";
+        msg += "Code " + String(apiWeather.forecastCode[i]) + "\n";
+    }
+    msg += "\n";
 
-  msg += "-- GPS --\n";
-  if (currentGPS.isValid) {
-    msg += "Lat: " + String(currentGPS.lat, 4) + " Lon: " + String(currentGPS.lon, 4) + "\n";
-    msg += "Alt: " + String(currentGPS.alt, 1) + " m Speed: " + String(currentGPS.speed, 1) + " km/h\n";
-    msg += "Sats: " + String(currentGPS.sats) + "\n";
-  } else {
-    msg += "GPS: No fix (using default)\n";
-  }
-  msg += "\n";
+    msg += "-- GPS --\n";
+    if (currentGPS.isValid) {
+        msg += "Lat: " + String(currentGPS.lat, 4) + " Lon: " + String(currentGPS.lon, 4) + "\n";
+        msg += "Alt: " + String(currentGPS.alt, 1) + " m Speed: " + String(currentGPS.speed, 1) + " km/h\n";
+        msg += "Sats: " + String(currentGPS.sats) + "\n";
+    } else {
+        msg += "GPS: No fix (using default)\n";
+    }
+    msg += "\n";
 
-  msg += "-- System --\n";
-  msg += "Uptime: " + getUptime() + "\n";
-  msg += "Free RAM: " + String(ESP.getFreeHeap() / 1024) + " KB\n";
-  msg += "WiFi SSID: " + WiFi.SSID() + "\n";
-  msg += "IP: " + WiFi.localIP().toString() + "\n";
+    msg += "-- System --\n";
+    msg += "Uptime: " + getUptime() + "\n";
+    msg += "Free RAM: " + String(ESP.getFreeHeap() / 1024) + " KB\n";
+    msg += "WiFi SSID: " + WiFi.SSID() + "\n";
+    msg += "IP: " + WiFi.localIP().toString() + "\n";
 
-  bot.sendTo(chatId, msg);
+    bot.sendTo(chatId, msg);
 }
 
 // Extended Telegram command handler
 void handleTelegram() {
   TBMessage msg;
   if (bot.getNewMessage(msg)) {
-    if (String(msg.chatId) != TELEGRAM_CHAT_ID) return;
-    String text = msg.text;
-    if (text.equalsIgnoreCase("/start")) {
-      bot.sendMessage(msg, "Station v" + String(PROJECT_VERSION) + " ready. Use /help for commands.");
-    }
-    else if (text.equalsIgnoreCase("/help") || text.equalsIgnoreCase("/commands")) {
-      String h = "/help - list commands\n";
-      h += "/status - short sensor & weather\n";
-      h += "/weather - current + 3-day forecast\n";
-      h += "/system - uptime, RAM, WiFi, IP\n";
-      h += "/gps - current GPS fix data\n";
-      h += "/alerts - current alerts\n";
-      h += "/reboot - reboot device\n";
-      bot.sendMessage(msg, h);
-    }
-    else if (text.equalsIgnoreCase("/status")) {
-      String s = "Int Temp: " + String(localSensor.temp,1) + "C\n";
-      s += "Ext Temp: " + String(apiWeather.temp,1) + "C\n";
-      s += "AQI: " + String(apiWeather.aqi) + "\n";
-      s += "Lux: " + String(localSensor.lux) + " lx\n";
-      bot.sendMessage(msg, s);
-    }
-    else if (text.equalsIgnoreCase("/weather")) {
-      String w = "Weather Provider: " + apiWeather.provider + "\n";
-      w += "Now: " + String(apiWeather.temp,1) + " C, Code " + String(apiWeather.weatherCode) + "\n";
-      w += "Forecast:\n";
-      for (int i=0;i<3;i++) w += "Day " + String(i+1) + ": Min " + String(apiWeather.forecastMin[i],0) + "C Max " + String(apiWeather.forecastMax[i],0) + "C Code " + String(apiWeather.forecastCode[i]) + "\n";
-      bot.sendMessage(msg, w);
-    }
-    else if (text.equalsIgnoreCase("/system")) {
-      String sy = "Uptime: " + getUptime() + "\n";
-      sy += "Free RAM: " + String(ESP.getFreeHeap() / 1024) + " KB\n";
-      sy += "WiFi: " + WiFi.SSID() + " (RSSI " + String(WiFi.RSSI()) + " dBm)\n";
-      sy += "IP: " + WiFi.localIP().toString() + "\n";
-      bot.sendMessage(msg, sy);
-    }
-    else if (text.equalsIgnoreCase("/gps")) {
-      if (currentGPS.isValid) {
-        String g = "Lat: " + String(currentGPS.lat,4) + " Lon: " + String(currentGPS.lon,4) + "\n";
-        g += "Alt: " + String(currentGPS.alt,1) + " m Speed: " + String(currentGPS.speed,1) + " km/h\n";
-        g += "Sats: " + String(currentGPS.sats) + "\n";
-        bot.sendMessage(msg, g);
-      } else bot.sendMessage(msg, "GPS: No fix available");
-    }
-    else if (text.equalsIgnoreCase("/alerts")) {
-      if (alertActive) bot.sendMessage(msg, "ALERT: " + alertMessage);
-      else bot.sendMessage(msg, "No alerts");
-    }
-    else if (text.equalsIgnoreCase("/reboot")) {
-      bot.sendMessage(msg, "Rebooting..."); delay(200); ESP.restart();
-    }
+      if (String(msg.chatId) != TELEGRAM_CHAT_ID) return;
+      String text = msg.text;
+      if (text.equalsIgnoreCase("/start")) {
+          bot.sendMessage(msg, "Station v" + String(PROJECT_VERSION) + " ready. Use /help for commands.");
+      }
+      else if (text.equalsIgnoreCase("/help") || text.equalsIgnoreCase("/commands")) {
+          String h = "/help - list commands\n";
+          h += "/status - short sensor & weather\n";
+          h += "/weather - current + 3-day forecast\n";
+          h += "/system - uptime, RAM, WiFi, IP\n";
+          h += "/gps - current GPS fix data\n";
+          h += "/alerts - current alerts\n";
+          h += "/reboot - reboot device\n";
+          bot.sendMessage(msg, h);
+      }
+      else if (text.equalsIgnoreCase("/status")) {
+          String s = "Int Temp: " + String(localSensor.temp,1) + "C\n";
+          s += "Ext Temp: " + String(apiWeather.temp,1) + "C\n";
+          s += "AQI: " + String(apiWeather.aqi) + "\n";
+          s += "Lux: " + String(localSensor.lux) + " lx\n";
+          bot.sendMessage(msg, s);
+      }
+      else if (text.equalsIgnoreCase("/weather")) {
+          String w = "Weather Provider: " + apiWeather.provider + "\n";
+          w += "Now: " + String(apiWeather.temp,1) + " C, Code " + String(apiWeather.weatherCode) + "\n";
+          w += "Forecast:\n";
+          for (int i=0;i<3;i++) w += "Day " + String(i+1) + ": Min " + String(apiWeather.forecastMin[i],0) + "C Max " + String(apiWeather.forecastMax[i],0) + "C Code " + String(apiWeather.forecastCode[i]) + "\n";
+          bot.sendMessage(msg, w);
+      }
+      else if (text.equalsIgnoreCase("/system")) {
+          String sy = "Uptime: " + getUptime() + "\n";
+          sy += "Free RAM: " + String(ESP.getFreeHeap() / 1024) + " KB\n";
+          sy += "WiFi: " + WiFi.SSID() + " (RSSI " + String(WiFi.RSSI()) + " dBm)\n";
+          sy += "IP: " + WiFi.localIP().toString() + "\n";
+          bot.sendMessage(msg, sy);
+      }
+      else if (text.equalsIgnoreCase("/gps")) {
+          if (currentGPS.isValid) {
+              String g = "Lat: " + String(currentGPS.lat,4) + " Lon: " + String(currentGPS.lon,4) + "\n";
+              g += "Alt: " + String(currentGPS.alt,1) + " m Speed: " + String(currentGPS.speed,1) + " km/h\n";
+              g += "Sats: " + String(currentGPS.sats) + "\n";
+              bot.sendMessage(msg, g);
+          } else bot.sendMessage(msg, "GPS: No fix available");
+      }
+      else if (text.equalsIgnoreCase("/alerts")) {
+          if (alertActive) bot.sendMessage(msg, "ALERT: " + alertMessage);
+          else bot.sendMessage(msg, "No alerts");
+      }
+      else if (text.equalsIgnoreCase("/reboot")) {
+          bot.sendMessage(msg, "Rebooting..."); delay(200); ESP.restart();
+      }
   }
 }
 
