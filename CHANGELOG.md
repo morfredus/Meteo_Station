@@ -2,11 +2,16 @@
 
 All notable changes to this project are documented in this file.
 
-## [2.6.1] - 2025-11-23
+## [2.6.3] - 2025-11-23
 ### Patch: Telegram & UX
 - **Telegram:** Send a detailed full status message at startup (weather, forecast, AQI, sensors, GPS, system).
 - **Telegram Commands:** Added `/help`, `/weather`, `/system`, `/gps`, `/alerts` and improved `/status` output.
 - **Diagnostics:** Ensures the bot only responds to the configured `TELEGRAM_CHAT_ID` and reports provider/uptime.
+
+## [2.6.2] - 2025-11-23
+### Patch: UX & Fun
+- **New:** Added a user-triggered "Party Mode" (long-press Action button) — a rainbow NeoPixel animation with a short melody.
+- **Docs:** Bumped project version to `2.6.3` in user-facing docs.
 
 
 ## [2.6.0] - 2025-11-22

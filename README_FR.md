@@ -1,6 +1,6 @@
 # Station Météo ESP32 (Projet Meteo_Station)
 
-**Version Actuelle : 2.6.1** (au 2025-11-23)
+**Version Actuelle : 2.6.3** (au 2025-11-23)
 
 Note : v2.6.0 améliore la fiabilité en changeant le fournisseur de données AQI vers l'API Open‑Meteo Air Quality (gratuite, sans clé API). Le projet conserve l'ensemble de bibliothèques réseau stable introduit lors du rollback v2.5.x.
 
