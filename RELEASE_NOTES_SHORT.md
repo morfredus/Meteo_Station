@@ -1,4 +1,4 @@
-# Release v2.6.0 — Short Notes
+# Release v2.6.3 — Short Notes
 
 ## English summary
 
