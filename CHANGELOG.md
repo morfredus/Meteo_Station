@@ -2,6 +2,18 @@
 
 All notable changes to this project are documented in this file.
 
+## [2.6.4] - 2025-11-23
+### Patch: Telegram & UX
+- **Telegram:** Send a short startup message at boot; the first full status report is sent automatically when sensor/weather measurements become available.
+- **Telegram Commands:** Added `/help`, `/weather`, `/system`, `/gps`, `/alerts`, improved `/status`, and added `/getreport` to request the full report on demand.
+- **Diagnostics:** Ensures the bot only responds to the configured `TELEGRAM_CHAT_ID` and reports provider/uptime.
+
+## [2.6.2] - 2025-11-23
+### Patch: UX & Fun
+- **New:** Added a user-triggered "Party Mode" (long-press Action button) — a rainbow NeoPixel animation with a short melody.
+- **Docs:** Bumped project version to `2.6.4` in user-facing docs.
+
+
 ## [2.6.0] - 2025-11-22
 ### Major Improvement (Reliability)
 - **AQI Provider:** Switched the air-quality data source to **Open‑Meteo Air Quality API**.

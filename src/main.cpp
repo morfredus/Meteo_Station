@@ -13,6 +13,7 @@
 #include <Adafruit_BMP280.h>
 #include <Adafruit_NeoPixel.h>
 #include <TinyGPSPlus.h>
+#include <TinyGPSPlus.h>
 #include <time.h>
 
 #include "config.h"
@@ -67,6 +68,10 @@ struct GPSData {
   String time = "--:--:--";
 } currentGPS;
 
+// First full status sent flag and stored chat id
+bool firstFullStatusSent = false;
+unsigned long telegramChatId = 0;
+
 bool alertActive = false;
 bool lastAlertActive = false; 
 String alertMessage = "Aucune";
@@ -90,6 +95,7 @@ void IRAM_ATTR isrActionBtn() { flagActionPressed = true; }
 
 // ================= PROTOTYPES =================
 void drawStartupScreen(); 
+bool measurementsAvailable();
 void initSensors();
 void updateSensors();
 void adjustBrightness();
@@ -97,9 +103,10 @@ void updatePressureTrend(float currentPres);
 void fetchWeather();          
 bool fetchOpenWeatherMap();   
 bool fetchOpenMeteo();        
-bool fetchAQI_OpenMeteo(); // MODIFIÉ : Source Open-Meteo
+bool fetchAQI_OpenMeteo(); // MODIFIE : Source Open-Meteo
 int mapOWMtoWMO(int owmId);   
 void handleTelegram(); 
+void sendTelegramFullStatus(unsigned long chatId);
 void refreshDisplayData();
 void drawFullPage();
 void beep(int count, int duration);
@@ -160,7 +167,9 @@ void setup() {
   bot.setTelegramToken(TELEGRAM_BOT_TOKEN);
   
   if (bot.begin()) {
-      bot.sendTo(atol(TELEGRAM_CHAT_ID), "Station v" + String(PROJECT_VERSION) + " Ready.");
+      unsigned long chat = atol(TELEGRAM_CHAT_ID);
+      telegramChatId = chat;
+      bot.sendTo(chat, "Station v" + String(PROJECT_VERSION) + " demarre. En attente des mesures pour le premier rapport...");
   }
   
   server.on("/", HTTP_GET, [](AsyncWebServerRequest *request){
@@ -244,6 +253,12 @@ void loop() {
     lastTimeSensor = now;
   }
 
+  // Après la première lecture des capteurs / météo, envoyer le premier rapport complet
+  if (!firstFullStatusSent && telegramChatId != 0 && measurementsAvailable()) {
+    sendTelegramFullStatus(telegramChatId);
+    firstFullStatusSent = true;
+  }
+
   if (now - lastTimeWeather > INTERVAL_WEATHER) {
     fetchWeather();
     refreshDisplayData();
@@ -261,18 +276,28 @@ void loop() {
 // ================= LOGIQUE METIER =================
 
 String cleanText(String s) {
-    s.replace("é", "e"); s.replace("è", "e"); s.replace("ê", "e"); s.replace("ë", "e");
+    s.replace("è", "e"); s.replace("é", "e"); s.replace("ê", "e"); s.replace("ë", "e");
     s.replace("à", "a"); s.replace("â", "a");
     s.replace("î", "i"); s.replace("ï", "i");
     s.replace("ô", "o");
     s.replace("ù", "u"); s.replace("û", "u");
     s.replace("ç", "c");
-    s.replace("É", "E"); s.replace("È", "E"); s.replace("Ê", "E");
+    s.replace("Ç", "C"); s.replace("È", "E"); s.replace("É", "E");
     s.replace("À", "A"); s.replace("Â", "A");
-    s.replace("Ô", "O"); s.replace("Ù", "U"); s.replace("Ç", "C");
-    s.replace("°", String((char)247)); 
+    s.replace("Ô", "O"); s.replace("Ù", "U"); s.replace("Û", "U");
+    s.replace("÷", String((char)247)); 
     return s;
 }
+
+  bool measurementsAvailable() {
+    // Consider measurements available if any sensor/weather/GPS provides non-default data
+    if (currentGPS.isValid) return true;
+    if (!isnan(localSensor.temp) && localSensor.hum > 0) return true;
+    if (!isnan(localSensor.pres) && localSensor.pres > 0) return true;
+    if (apiWeather.temp != 0.0) return true;
+    if (localSensor.lux > 0) return true;
+    return false;
+  }
 
 void adjustBrightness() {
     if (autoBrightnessMode) {
@@ -316,17 +341,111 @@ void showToastMessage(String msg, uint16_t color) {
     drawFullPage(); refreshDisplayData();
 }
 
+// Send a complete formatted status to a chat id
+void sendTelegramFullStatus(unsigned long chatId) {
+  String msg = "Station Meteo - Status v" + String(PROJECT_VERSION) + "\n\n";
+  msg += "-- Sensors (local) --\n";
+  msg += "Temp: " + String(localSensor.temp, 1) + " C\n";
+  msg += "Hum: " + String(localSensor.hum, 0) + " %\n";
+  if (isnan(localSensor.pres)) msg += "Pres: N/A\n";
+  else msg += "Pres: " + String(localSensor.pres, 0) + " hPa\n";
+  msg += "Lux: " + String(localSensor.lux) + " lx\n";
+  msg += "Trend: " + localSensor.trend + "\n\n";
+
+  msg += "-- Weather (api) --\n";
+  msg += "Outside Temp: " + String(apiWeather.temp, 1) + " C\n";
+  msg += "Weather Code: " + String(apiWeather.weatherCode) + "\n";
+  msg += "AQI (1-5): " + String(apiWeather.aqi) + "\n";
+  msg += "Provider: " + apiWeather.provider + "\n\n";
+
+  msg += "-- Forecast (3 days) --\n";
+  for (int i = 0; i < 3; i++) {
+    msg += "Day " + String(i+1) + ": ";
+    msg += "Min " + String(apiWeather.forecastMin[i], 0) + "C ";
+    msg += "Max " + String(apiWeather.forecastMax[i], 0) + "C ";
+    msg += "Code " + String(apiWeather.forecastCode[i]) + "\n";
+  }
+  msg += "\n";
+
+  msg += "-- GPS --\n";
+  if (currentGPS.isValid) {
+    msg += "Lat: " + String(currentGPS.lat, 4) + " Lon: " + String(currentGPS.lon, 4) + "\n";
+    msg += "Alt: " + String(currentGPS.alt, 1) + " m Speed: " + String(currentGPS.speed, 1) + " km/h\n";
+    msg += "Sats: " + String(currentGPS.sats) + "\n";
+  } else {
+    msg += "GPS: No fix (using default)\n";
+  }
+  msg += "\n";
+
+  msg += "-- System --\n";
+  msg += "Uptime: " + getUptime() + "\n";
+  msg += "Free RAM: " + String(ESP.getFreeHeap() / 1024) + " KB\n";
+  msg += "WiFi SSID: " + WiFi.SSID() + "\n";
+  msg += "IP: " + WiFi.localIP().toString() + "\n";
+
+  bot.sendTo(chatId, msg);
+}
+
+// Extended Telegram command handler
 void handleTelegram() {
   TBMessage msg;
   if (bot.getNewMessage(msg)) {
-      if (String(msg.chatId) != TELEGRAM_CHAT_ID) return;
-      String text = msg.text;
-      if (text.equalsIgnoreCase("/start")) bot.sendMessage(msg, "Station v" + String(PROJECT_VERSION) + "\n/status");
-      else if (text.equalsIgnoreCase("/status")) {
-          String s = "🌡 Int: " + String(localSensor.temp) + "C\n🌍 Ext: " + String(apiWeather.temp) + "C\nAQI: " + String(apiWeather.aqi) + "\nLux: " + String(localSensor.lux);
-          bot.sendMessage(msg, s);
-      }
-      else if (text.equalsIgnoreCase("/reboot")) ESP.restart();
+    if (String(msg.chatId) != TELEGRAM_CHAT_ID) return;
+    String text = msg.text;
+    if (text.equalsIgnoreCase("/start")) {
+      bot.sendMessage(msg, "Station v" + String(PROJECT_VERSION) + " ready. Use /help for commands.");
+    }
+    else if (text.equalsIgnoreCase("/help") || text.equalsIgnoreCase("/commands")) {
+      String h = "/help - list commands\n";
+      h += "/status - short sensor & weather\n";
+      h += "/getreport - full status report now\n";
+      h += "/weather - current + 3-day forecast\n";
+      h += "/system - uptime, RAM, WiFi, IP\n";
+      h += "/gps - current GPS fix data\n";
+      h += "/alerts - current alerts\n";
+      h += "/reboot - reboot device\n";
+      bot.sendMessage(msg, h);
+    }
+    else if (text.equalsIgnoreCase("/status")) {
+      String s = "Int Temp: " + String(localSensor.temp,1) + "C\n";
+      s += "Ext Temp: " + String(apiWeather.temp,1) + "C\n";
+      s += "AQI: " + String(apiWeather.aqi) + "\n";
+      s += "Lux: " + String(localSensor.lux) + " lx\n";
+      bot.sendMessage(msg, s);
+    }
+    else if (text.equalsIgnoreCase("/getreport") || text.equalsIgnoreCase("/get")) {
+      // Send a full status on demand
+      sendTelegramFullStatus(msg.chatId);
+    }
+    else if (text.equalsIgnoreCase("/weather")) {
+      String w = "Weather Provider: " + apiWeather.provider + "\n";
+      w += "Now: " + String(apiWeather.temp,1) + " C, Code " + String(apiWeather.weatherCode) + "\n";
+      w += "Forecast:\n";
+      for (int i=0;i<3;i++) w += "Day " + String(i+1) + ": Min " + String(apiWeather.forecastMin[i],0) + "C Max " + String(apiWeather.forecastMax[i],0) + "C Code " + String(apiWeather.forecastCode[i]) + "\n";
+      bot.sendMessage(msg, w);
+    }
+    else if (text.equalsIgnoreCase("/system")) {
+      String sy = "Uptime: " + getUptime() + "\n";
+      sy += "Free RAM: " + String(ESP.getFreeHeap() / 1024) + " KB\n";
+      sy += "WiFi: " + WiFi.SSID() + " (RSSI " + String(WiFi.RSSI()) + " dBm)\n";
+      sy += "IP: " + WiFi.localIP().toString() + "\n";
+      bot.sendMessage(msg, sy);
+    }
+    else if (text.equalsIgnoreCase("/gps")) {
+      if (currentGPS.isValid) {
+        String g = "Lat: " + String(currentGPS.lat,4) + " Lon: " + String(currentGPS.lon,4) + "\n";
+        g += "Alt: " + String(currentGPS.alt,1) + " m Speed: " + String(currentGPS.speed,1) + " km/h\n";
+        g += "Sats: " + String(currentGPS.sats) + "\n";
+        bot.sendMessage(msg, g);
+      } else bot.sendMessage(msg, "GPS: No fix available");
+    }
+    else if (text.equalsIgnoreCase("/alerts")) {
+      if (alertActive) bot.sendMessage(msg, "ALERT: " + alertMessage);
+      else bot.sendMessage(msg, "No alerts");
+    }
+    else if (text.equalsIgnoreCase("/reboot")) {
+      bot.sendMessage(msg, "Rebooting..."); delay(200); ESP.restart();
+    }
   }
 }
 
@@ -526,7 +645,7 @@ void drawStartupScreen() {
   drawSunRays(120, 90, angle, C_YELLOW);
   tft.fillRect(0, 200, 240, 40, C_BLACK); 
   tft.setCursor(10, 210); tft.setTextColor(C_GREEN); tft.setTextSize(1);
-  tft.print(cleanText("Connecté: ")); tft.println(WiFi.SSID());
+  tft.print(cleanText("Connecte: ")); tft.println(WiFi.SSID());
   beep(2, 100); delay(1500);
 }
 
@@ -573,30 +692,30 @@ void drawFullPage() {
   tft.setTextColor(C_WHITE); tft.setTextSize(2);
 
   if (currentPage == 0) { // RESUME
-    tft.setCursor(10, 50); tft.print(cleanText("INTÉRIEUR"));
+    tft.setCursor(10, 50); tft.print(cleanText("INTERIEUR"));
     tft.drawLine(10, 70, 230, 70, C_GREY);
-    tft.setCursor(10, 130); tft.print(cleanText("EXTÉRIEUR"));
+    tft.setCursor(10, 130); tft.print(cleanText("EXTERIEUR"));
     tft.drawLine(10, 150, 230, 150, C_GREY);
   }
   else if (currentPage == 1) { // ENVIRONNEMENT
     tft.setCursor(10, 45); tft.print(cleanText("ENVIRONNEMENT")); tft.drawLine(10, 65, 230, 65, C_GREY);
     tft.setTextSize(1); tft.setTextColor(C_GREY);
-    tft.setCursor(10, 80); tft.print(cleanText("HUMIDITÉ")); tft.setCursor(120, 80); tft.print("PRESSION");
-    tft.setCursor(10, 140); tft.print(cleanText("LUMINOSITÉ")); tft.setCursor(120, 140); tft.print(cleanText("QUALITÉ AIR"));
+    tft.setCursor(10, 80); tft.print(cleanText("HUMIDITE")); tft.setCursor(120, 80); tft.print("PRESSION");
+    tft.setCursor(10, 140); tft.print(cleanText("LUMINOSITE")); tft.setCursor(120, 140); tft.print(cleanText("QUALITE AIR"));
   }
   else if (currentPage == 2) { // PREVISIONS
-     tft.setCursor(10, 45); tft.print(cleanText("PRÉVISIONS (3J)")); tft.drawLine(10, 65, 230, 65, C_GREY);
+     tft.setCursor(10, 45); tft.print(cleanText("PREVISIONS (3J)")); tft.drawLine(10, 65, 230, 65, C_GREY);
      tft.drawLine(10, 115, 230, 115, 0x2104);
      tft.drawLine(10, 165, 230, 165, 0x2104);
   }
   else if (currentPage == 3) { // GPS
-    tft.setCursor(10, 45); tft.print(cleanText("DONNÉES GPS")); tft.drawLine(10, 65, 230, 65, C_GREY);
+    tft.setCursor(10, 45); tft.print(cleanText("DONNEES GPS")); tft.drawLine(10, 65, 230, 65, C_GREY);
   }
   else if (currentPage == 4) { // RESEAU
-     tft.setCursor(10, 45); tft.print(cleanText("RÉSEAU & SYS")); tft.drawLine(10, 65, 230, 65, C_GREY);
+     tft.setCursor(10, 45); tft.print(cleanText("RESEAU & SYS")); tft.drawLine(10, 65, 230, 65, C_GREY);
   }
   else if (currentPage == 5) { // ETAT SYSTEME
-    tft.setCursor(10, 45); tft.print(cleanText("ÉTAT SYSTÈME")); tft.drawLine(10, 65, 230, 65, C_GREY);
+    tft.setCursor(10, 45); tft.print(cleanText("ETAT SYSTEME")); tft.drawLine(10, 65, 230, 65, C_GREY);
     tft.drawLine(10, 120, 230, 120, 0x2104);
     tft.drawLine(10, 180, 230, 180, 0x2104);
   }
@@ -668,7 +787,7 @@ void refreshDisplayData() {
       }
   }
   else if (currentPage == 3) { // GPS
-    if(!currentGPS.isValid) { tft.setTextSize(1); tft.setTextColor(C_ORANGE, C_BLACK); tft.setCursor(130, 55); tft.print("SIMULATION"); } else { tft.fillRect(130, 55, 100, 10, C_BLACK); }
+    if(!currentGPS.isValid) { tft.setTextSize(1); tft.setTextColor(C_YELLOW, C_BLACK); tft.setCursor(96, 75); tft.print("SIMULATION"); } else { tft.fillRect(96, 75, 70, 10, C_BLACK); }
     tft.setTextColor(C_WHITE, C_BLACK); tft.setTextSize(2);
     tft.setCursor(10, 95); tft.printf("%.4f", currentGPS.lat); tft.setCursor(120, 95); tft.printf("%.4f", currentGPS.lon);
     tft.setCursor(10, 145); tft.printf("%.0f m ", currentGPS.alt); tft.setCursor(120, 145); tft.printf("%.1f km", currentGPS.speed);
@@ -698,7 +817,7 @@ void refreshDisplayData() {
       tft.setTextColor(C_WHITE, C_BLACK); tft.setTextSize(1);
       tft.setCursor(10, 130); tft.print("Uptime: "); tft.print(getUptime());
       tft.setCursor(10, 145); tft.print("RAM: "); tft.print(ESP.getFreeHeap() / 1024); tft.print(" KB libre");
-      tft.setCursor(10, 160); tft.print(cleanText("Source Météo: ")); tft.print(apiWeather.provider);
+      tft.setCursor(10, 160); tft.print(cleanText("Source Meteo: ")); tft.print(apiWeather.provider);
       
       tft.setCursor(10, 190); tft.print("WiFi: "); tft.print(WiFi.SSID());
       tft.setCursor(10, 205); tft.print("Signal: "); tft.print(WiFi.RSSI()); tft.print(" dBm");

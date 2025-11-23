@@ -1,0 +1,47 @@
+#!/bin/sh
+# Git pre-commit hook: enforce filename casing policy
+# - All source files (non .md) and path segments must be lowercase
+# - Documentation files (extension .md) must have FILENAME in ALL UPPERCASE and extension `.md` (lowercase)
+
+staged_files=$(git diff --cached --name-only --diff-filter=ACM)
+if [ -z "$staged_files" ]; then
+  exit 0
+fi
+
+bad=0
+for f in $staged_files; do
+  # get extension and filename
+  filename="$(basename "$f")"
+  ext="${filename##*.}"
+  name_no_ext="${filename%.*}"
+
+  # check extension is lowercase
+  ext_lc=$(echo "$ext" | tr 'A-Z' 'a-z')
+  if [ "$ext_lc" != "$ext" ]; then
+    echo "ERROR: Extension must be lowercase for '$f' (found '.$ext')"
+    bad=1
+  fi
+
+  if [ "$ext_lc" = "md" ]; then
+    # md files: filename (without ext) must be ALL UPPERCASE
+    if echo "$name_no_ext" | grep -q '[a-z]'; then
+      echo "ERROR: Markdown documentation filename must be ALL UPPERCASE (without extension): '$f'"
+      bad=1
+    fi
+  else
+    # non-md files: entire path must be lowercase (no uppercase letters)
+    if echo "$f" | grep -q '[A-Z]'; then
+      echo "ERROR: Source filenames and path segments must be lowercase: '$f'"
+      bad=1
+    fi
+  fi
+done
+
+if [ $bad -ne 0 ]; then
+  echo "\nCommit aborted. Rename files to conform to naming policy:" 
+  echo "- source files: all lowercase paths and filenames"
+  echo "- documentation: FILENAME must be ALL UPPERCASE and extension '.md' (lowercase)"
+  exit 1
+fi
+
+exit 0

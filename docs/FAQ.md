@@ -1,4 +1,4 @@
-# Latest release: **v2.6.0** — AQI provider switched to Open‑Meteo Air Quality API (free, no API key).
+# Latest release: **v2.6.4** — AQI provider switched to Open‑Meteo Air Quality API (free, no API key).
 
 # Frequently Asked Questions (FAQ)
 
