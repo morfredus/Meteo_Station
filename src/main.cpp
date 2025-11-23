@@ -521,9 +521,18 @@ bool fetchOpenWeatherMap() {
                 apiWeather.forecastCode[i] = mapOWMtoWMO(doc["daily"][i+1]["weather"][0]["id"]);
             }
             if (doc["alerts"].is<JsonArray>()) {
-                alertActive = true; alertMessage = doc["alerts"][0]["event"].as<String>();
-            } else if (localSensor.temp < ALERT_TEMP_HIGH && localSensor.temp > ALERT_TEMP_LOW) {
-                alertActive = false; alertMessage = "Aucune alerte";
+              alertActive = true;
+              alertMessage = doc["alerts"][0]["event"].as<String>();
+              // Force l'affichage immédiat de la page d'alerte
+              lastAlertActive = false; // permettre la transition
+              currentPage = 5;
+              beep(5, 100);
+              drawFullPage();
+              refreshDisplayData();
+            } else {
+              // Pas d'alerte météo renvoyée -> on réinitialise proprement
+              alertActive = false;
+              alertMessage = "Aucune alerte";
             }
             http.end(); return true;
         }
