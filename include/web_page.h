@@ -104,10 +104,9 @@ const char index_html[] PROGMEM = R"rawliteral(
     </div>
   </div>
 
-  <div class="footer">
-    Système v2.0.0 • ESP32-S3 • <a href="/api/data" target="_blank" style="color:#666">Voir JSON Brut</a>
+    <div class="footer">
+    Système v)rawliteral" PROJECT_VERSION R"rawliteral( • ESP32-S3 • <a href="/api/data" target="_blank" style="color:#666">Voir JSON Brut</a>
   </div>
-</div>
 
 <script>
   function getAQIColor(aqi) {

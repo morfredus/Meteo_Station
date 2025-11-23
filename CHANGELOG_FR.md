@@ -1,15 +1,15 @@
 # Historique des Versions (Changelog)
 
-## [2.6.3] - 2025-11-23
-### Correctif : Telegram & UX
-- **Telegram :** Envoi au démarrage d'un message détaillé (météo, prévisions, AQI, capteurs, GPS, état système).
-- **Commandes Telegram :** Ajout de `/help`, `/weather`, `/system`, `/gps`, `/alerts` et amélioration de `/status`.
+## [2.6.4] - 2025-11-23
+-### Correctif : Telegram & UX
+- **Telegram :** Envoi au démarrage d'un message de démarrage court ; le premier rapport complet est envoyé automatiquement lorsque les mesures (capteurs / météo) sont disponibles.
+- **Commandes Telegram :** Ajout de `/help`, `/weather`, `/system`, `/gps`, `/alerts`, amélioration de `/status` et ajout de `/getreport` pour demander le rapport complet à la demande.
 - **Sécurité :** Le bot ne répond qu'au `TELEGRAM_CHAT_ID` configuré.
 
 ## [2.6.2] - 2025-11-23
 ### Correctif : UX & Fun
 - **Nouveau :** Ajout du "Party Mode" déclenché par un appui long sur le bouton Action — animation NeoPixel arc-en-ciel et petite mélodie.
-- **Docs :** Mise à jour du numéro de version à `2.6.3` dans la documentation utilisateur.
+- **Docs :** Mise à jour du numéro de version à `2.6.4` dans la documentation utilisateur.
 
 ## [2.6.0] - 2025-11-22
 ### Amélioration Majeure (Fiabilité)

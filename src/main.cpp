@@ -68,6 +68,10 @@ struct GPSData {
   String time = "--:--:--";
 } currentGPS;
 
+// First full status sent flag and stored chat id
+bool firstFullStatusSent = false;
+unsigned long telegramChatId = 0;
+
 bool alertActive = false;
 bool lastAlertActive = false; 
 String alertMessage = "Aucune";
@@ -91,6 +95,7 @@ void IRAM_ATTR isrActionBtn() { flagActionPressed = true; }
 
 // ================= PROTOTYPES =================
 void drawStartupScreen(); 
+bool measurementsAvailable();
 void initSensors();
 void updateSensors();
 void adjustBrightness();
@@ -163,9 +168,8 @@ void setup() {
   
   if (bot.begin()) {
       unsigned long chat = atol(TELEGRAM_CHAT_ID);
-      bot.sendTo(chat, "Station v" + String(PROJECT_VERSION) + " Ready.");
-      // Send detailed full status at startup
-      sendTelegramFullStatus(chat);
+      telegramChatId = chat;
+      bot.sendTo(chat, "Station v" + String(PROJECT_VERSION) + " demarre. En attente des mesures pour le premier rapport...");
   }
   
   server.on("/", HTTP_GET, [](AsyncWebServerRequest *request){
@@ -249,6 +253,12 @@ void loop() {
     lastTimeSensor = now;
   }
 
+  // Après la première lecture des capteurs / météo, envoyer le premier rapport complet
+  if (!firstFullStatusSent && telegramChatId != 0 && measurementsAvailable()) {
+    sendTelegramFullStatus(telegramChatId);
+    firstFullStatusSent = true;
+  }
+
   if (now - lastTimeWeather > INTERVAL_WEATHER) {
     fetchWeather();
     refreshDisplayData();
@@ -278,6 +288,16 @@ String cleanText(String s) {
     s.replace("÷", String((char)247)); 
     return s;
 }
+
+  bool measurementsAvailable() {
+    // Consider measurements available if any sensor/weather/GPS provides non-default data
+    if (currentGPS.isValid) return true;
+    if (!isnan(localSensor.temp) && localSensor.hum > 0) return true;
+    if (!isnan(localSensor.pres) && localSensor.pres > 0) return true;
+    if (apiWeather.temp != 0.0) return true;
+    if (localSensor.lux > 0) return true;
+    return false;
+  }
 
 void adjustBrightness() {
     if (autoBrightnessMode) {
@@ -378,6 +398,7 @@ void handleTelegram() {
     else if (text.equalsIgnoreCase("/help") || text.equalsIgnoreCase("/commands")) {
       String h = "/help - list commands\n";
       h += "/status - short sensor & weather\n";
+      h += "/getreport - full status report now\n";
       h += "/weather - current + 3-day forecast\n";
       h += "/system - uptime, RAM, WiFi, IP\n";
       h += "/gps - current GPS fix data\n";
@@ -391,6 +412,10 @@ void handleTelegram() {
       s += "AQI: " + String(apiWeather.aqi) + "\n";
       s += "Lux: " + String(localSensor.lux) + " lx\n";
       bot.sendMessage(msg, s);
+    }
+    else if (text.equalsIgnoreCase("/getreport") || text.equalsIgnoreCase("/get")) {
+      // Send a full status on demand
+      sendTelegramFullStatus(msg.chatId);
     }
     else if (text.equalsIgnoreCase("/weather")) {
       String w = "Weather Provider: " + apiWeather.provider + "\n";

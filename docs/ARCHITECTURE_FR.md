@@ -1,6 +1,6 @@
 # Architecture du Projet
 
-Dernière version : **v2.6.3** — Fournisseur AQI changé vers Open‑Meteo Air Quality (gratuit, sans clé API). Le projet utilise toujours les forks réseau stables.
+Dernière version : **v2.6.4** — Fournisseur AQI changé vers Open‑Meteo Air Quality (gratuit, sans clé API). Le projet utilise toujours les forks réseau stables.
 
 Ce document donne un aperçu de l'architecture logicielle de la station météo.
 

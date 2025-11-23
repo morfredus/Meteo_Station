@@ -1,6 +1,6 @@
 # ESP32 Weather Station (Meteo_Station Project)
 
-**Current Version: 2.6.3** (as of 2025-11-23)
+**Current Version: 2.6.4** (as of 2025-11-23)
 
 Note: v2.6.0 improves reliability by switching the AQI data source to the Open‑Meteo Air Quality API (free, no API key required). The project remains on the stable network library set introduced in the v2.5.x rollback.
 
@@ -23,6 +23,7 @@ The user interface is displayed on a color TFT screen and can be controlled via 
   - **Asynchronous Web Server:** A web interface to view data from a browser.
   - **JSON API (`/api/data`):** Allows for easy integration of the station's data into other systems.
   - **Telegram Bot:** Control the station and receive alerts directly on Telegram.
+  - **Telegram Bot:** Control the station and receive alerts directly on Telegram. New command: `/getreport` — request a full status report on demand. The bot now sends only a short startup message at boot; the first full report is sent automatically once sensor/weather measurements are available.
 - **Stability & Performance:**
   - **Network Anti-Freeze:** An HTTP request timeout prevents the device from freezing.
   - **Reliable Button Handling:** Uses interrupts and a refractory period to prevent bounce and double presses.

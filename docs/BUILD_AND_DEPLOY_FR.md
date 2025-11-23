@@ -1,4 +1,4 @@
-# Dernière version : **v2.6.3** — Fournisseur AQI changé vers Open‑Meteo Air Quality (gratuit, sans clé API).
+# Dernière version : **v2.6.4** — Fournisseur AQI changé vers Open‑Meteo Air Quality (gratuit, sans clé API).
 
 # Compilation & Déploiement
 
