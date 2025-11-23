@@ -13,6 +13,7 @@
 #include <Adafruit_BMP280.h>
 #include <Adafruit_NeoPixel.h>
 #include <TinyGPSPlus.h>
+#include <TinyGPSPlus.h>
 #include <time.h>
 
 #include "config.h"
@@ -37,7 +38,7 @@ struct SensorData {
   float hum = 0.0;
   float pres = 0.0;
   int lux = 0;
-  String trend = "???";
+  String trend = "→";
 } localSensor;
 
 float pressureHistory = 0.0;
@@ -97,7 +98,7 @@ void updatePressureTrend(float currentPres);
 void fetchWeather();          
 bool fetchOpenWeatherMap();   
 bool fetchOpenMeteo();        
-bool fetchAQI_OpenMeteo(); // MODIFI?? : Source Open-Meteo
+bool fetchAQI_OpenMeteo(); // MODIFIE : Source Open-Meteo
 int mapOWMtoWMO(int owmId);   
 void handleTelegram(); 
 void sendTelegramFullStatus(unsigned long chatId);
@@ -137,7 +138,7 @@ void setup() {
   ledcAttachPin(TFT_BL, BACKLIGHT_LEDC_CHANNEL);
   ledcWrite(BACKLIGHT_LEDC_CHANNEL, 255);
 
-  // Config LDR (GPIO 4 pour ESP32-S3 recommand??)
+  // Config LDR (GPIO 4 pour ESP32-S3 recommandé)
   pinMode(PIN_LIGHT_SENSOR, INPUT);
   Serial.printf("LDR configure sur PIN: %d\n", PIN_LIGHT_SENSOR);
 
@@ -265,16 +266,16 @@ void loop() {
 // ================= LOGIQUE METIER =================
 
 String cleanText(String s) {
-    s.replace("??", "e"); s.replace("??", "e"); s.replace("??", "e"); s.replace("??", "e");
-    s.replace("??", "a"); s.replace("??", "a");
-    s.replace("??", "i"); s.replace("??", "i");
-    s.replace("??", "o");
-    s.replace("??", "u"); s.replace("??", "u");
-    s.replace("??", "c");
-    s.replace("??", "E"); s.replace("??", "E"); s.replace("??", "E");
-    s.replace("??", "A"); s.replace("??", "A");
-    s.replace("??", "O"); s.replace("??", "U"); s.replace("??", "C");
-    s.replace("??", String((char)247)); 
+    s.replace("è", "e"); s.replace("é", "e"); s.replace("ê", "e"); s.replace("ë", "e");
+    s.replace("à", "a"); s.replace("â", "a");
+    s.replace("î", "i"); s.replace("ï", "i");
+    s.replace("ô", "o");
+    s.replace("ù", "u"); s.replace("û", "u");
+    s.replace("ç", "c");
+    s.replace("Ç", "C"); s.replace("È", "E"); s.replace("É", "E");
+    s.replace("À", "A"); s.replace("Â", "A");
+    s.replace("Ô", "O"); s.replace("Ù", "U"); s.replace("Û", "U");
+    s.replace("÷", String((char)247)); 
     return s;
 }
 
@@ -552,7 +553,7 @@ bool fetchAQI_OpenMeteo() {
             int rawAqi = doc["current"]["european_aqi"]; // Echelle 0-100+
             Serial.printf("Raw CAQI: %d\n", rawAqi);
             
-            // Conversion ??chelle CAQI (0-100) vers Echelle 1-5 de votre affichage
+            // Conversion échelle CAQI (0-100) vers Echelle 1-5 de votre affichage
             // 1=Bon, 2=Moyen, 3=Degrade, 4=Mauvais, 5=Dangereux
             if (rawAqi < 20) apiWeather.aqi = 1;
             else if (rawAqi < 40) apiWeather.aqi = 2;
@@ -619,7 +620,7 @@ void drawStartupScreen() {
   drawSunRays(120, 90, angle, C_YELLOW);
   tft.fillRect(0, 200, 240, 40, C_BLACK); 
   tft.setCursor(10, 210); tft.setTextColor(C_GREEN); tft.setTextSize(1);
-  tft.print(cleanText("Connect??: ")); tft.println(WiFi.SSID());
+  tft.print(cleanText("Connecte: ")); tft.println(WiFi.SSID());
   beep(2, 100); delay(1500);
 }
 
@@ -666,30 +667,30 @@ void drawFullPage() {
   tft.setTextColor(C_WHITE); tft.setTextSize(2);
 
   if (currentPage == 0) { // RESUME
-    tft.setCursor(10, 50); tft.print(cleanText("INT??RIEUR"));
+    tft.setCursor(10, 50); tft.print(cleanText("INTERIEUR"));
     tft.drawLine(10, 70, 230, 70, C_GREY);
-    tft.setCursor(10, 130); tft.print(cleanText("EXT??RIEUR"));
+    tft.setCursor(10, 130); tft.print(cleanText("EXTERIEUR"));
     tft.drawLine(10, 150, 230, 150, C_GREY);
   }
   else if (currentPage == 1) { // ENVIRONNEMENT
     tft.setCursor(10, 45); tft.print(cleanText("ENVIRONNEMENT")); tft.drawLine(10, 65, 230, 65, C_GREY);
     tft.setTextSize(1); tft.setTextColor(C_GREY);
-    tft.setCursor(10, 80); tft.print(cleanText("HUMIDIT??")); tft.setCursor(120, 80); tft.print("PRESSION");
-    tft.setCursor(10, 140); tft.print(cleanText("LUMINOSIT??")); tft.setCursor(120, 140); tft.print(cleanText("QUALIT?? AIR"));
+    tft.setCursor(10, 80); tft.print(cleanText("HUMIDITE")); tft.setCursor(120, 80); tft.print("PRESSION");
+    tft.setCursor(10, 140); tft.print(cleanText("LUMINOSITE")); tft.setCursor(120, 140); tft.print(cleanText("QUALITE AIR"));
   }
   else if (currentPage == 2) { // PREVISIONS
-     tft.setCursor(10, 45); tft.print(cleanText("PR??VISIONS (3J)")); tft.drawLine(10, 65, 230, 65, C_GREY);
+     tft.setCursor(10, 45); tft.print(cleanText("PREVISIONS (3J)")); tft.drawLine(10, 65, 230, 65, C_GREY);
      tft.drawLine(10, 115, 230, 115, 0x2104);
      tft.drawLine(10, 165, 230, 165, 0x2104);
   }
   else if (currentPage == 3) { // GPS
-    tft.setCursor(10, 45); tft.print(cleanText("DONN??ES GPS")); tft.drawLine(10, 65, 230, 65, C_GREY);
+    tft.setCursor(10, 45); tft.print(cleanText("DONNEES GPS")); tft.drawLine(10, 65, 230, 65, C_GREY);
   }
   else if (currentPage == 4) { // RESEAU
-     tft.setCursor(10, 45); tft.print(cleanText("R??SEAU & SYS")); tft.drawLine(10, 65, 230, 65, C_GREY);
+     tft.setCursor(10, 45); tft.print(cleanText("RESEAU & SYS")); tft.drawLine(10, 65, 230, 65, C_GREY);
   }
   else if (currentPage == 5) { // ETAT SYSTEME
-    tft.setCursor(10, 45); tft.print(cleanText("??TAT SYST??ME")); tft.drawLine(10, 65, 230, 65, C_GREY);
+    tft.setCursor(10, 45); tft.print(cleanText("ETAT SYSTEME")); tft.drawLine(10, 65, 230, 65, C_GREY);
     tft.drawLine(10, 120, 230, 120, 0x2104);
     tft.drawLine(10, 180, 230, 180, 0x2104);
   }
@@ -761,7 +762,7 @@ void refreshDisplayData() {
       }
   }
   else if (currentPage == 3) { // GPS
-    if(!currentGPS.isValid) { tft.setTextSize(1); tft.setTextColor(C_ORANGE, C_BLACK); tft.setCursor(130, 55); tft.print("SIMULATION"); } else { tft.fillRect(130, 55, 100, 10, C_BLACK); }
+    if(!currentGPS.isValid) { tft.setTextSize(1); tft.setTextColor(C_YELLOW, C_BLACK); tft.setCursor(96, 75); tft.print("SIMULATION"); } else { tft.fillRect(96, 75, 70, 10, C_BLACK); }
     tft.setTextColor(C_WHITE, C_BLACK); tft.setTextSize(2);
     tft.setCursor(10, 95); tft.printf("%.4f", currentGPS.lat); tft.setCursor(120, 95); tft.printf("%.4f", currentGPS.lon);
     tft.setCursor(10, 145); tft.printf("%.0f m ", currentGPS.alt); tft.setCursor(120, 145); tft.printf("%.1f km", currentGPS.speed);
@@ -791,7 +792,7 @@ void refreshDisplayData() {
       tft.setTextColor(C_WHITE, C_BLACK); tft.setTextSize(1);
       tft.setCursor(10, 130); tft.print("Uptime: "); tft.print(getUptime());
       tft.setCursor(10, 145); tft.print("RAM: "); tft.print(ESP.getFreeHeap() / 1024); tft.print(" KB libre");
-      tft.setCursor(10, 160); tft.print(cleanText("Source M??t??o: ")); tft.print(apiWeather.provider);
+      tft.setCursor(10, 160); tft.print(cleanText("Source Meteo: ")); tft.print(apiWeather.provider);
       
       tft.setCursor(10, 190); tft.print("WiFi: "); tft.print(WiFi.SSID());
       tft.setCursor(10, 205); tft.print("Signal: "); tft.print(WiFi.RSSI()); tft.print(" dBm");
