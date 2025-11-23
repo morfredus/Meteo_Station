@@ -320,20 +320,6 @@ void showToastMessage(String msg, uint16_t color) {
     drawFullPage(); refreshDisplayData();
 }
 
-void handleTelegram() {
-  TBMessage msg;
-  if (bot.getNewMessage(msg)) {
-      if (String(msg.chatId) != TELEGRAM_CHAT_ID) return;
-      String text = msg.text;
-      if (text.equalsIgnoreCase("/start")) bot.sendMessage(msg, "Station v" + String(PROJECT_VERSION) + "\n/status");
-      else if (text.equalsIgnoreCase("/status")) {
-          String s = "🌡 Int: " + String(localSensor.temp) + "C\n🌍 Ext: " + String(apiWeather.temp) + "C\nAQI: " + String(apiWeather.aqi) + "\nLux: " + String(localSensor.lux);
-          bot.sendMessage(msg, s);
-      }
-      else if (text.equalsIgnoreCase("/reboot")) ESP.restart();
-  }
-}
-
 // Send a complete formatted status to a chat id
 void sendTelegramFullStatus(unsigned long chatId) {
   String msg = "Station Meteo - Status v" + String(PROJECT_VERSION) + "\n\n";
