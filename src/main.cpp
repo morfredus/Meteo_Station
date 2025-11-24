@@ -49,6 +49,9 @@ bool ahtAvailable = false;  // Track si AHT20 est disponible
 // Log helper for missing AHT20 to avoid spamming the serial
 unsigned long lastAhtWarn = 0;
 const unsigned long AHT_WARN_INTERVAL = 300000; // 5 minutes
+// Store I2C scan results for the debug endpoint
+uint8_t i2cDevices[32];
+int i2cDeviceCount = 0;
 
 struct WeatherData {
   float temp = 0.0;
@@ -151,6 +154,7 @@ void setup() {
   // Config LDR (GPIO 4 pour ESP32-S3 recommandé)
   pinMode(PIN_LIGHT_SENSOR, INPUT);
   Serial.printf("LDR configure sur PIN: %d\n", PIN_LIGHT_SENSOR);
+  Serial.printf("LDR configure sur PIN: %d\n", PIN_LIGHT_SENSOR);
 
   pixels.begin();
   pixels.setBrightness(NEOPIXEL_BRIGHTNESS);
@@ -159,11 +163,15 @@ void setup() {
   Wire.begin(PIN_I2C_SDA, PIN_I2C_SCL);
   // I2C bus scan: lister les adresses détectées pour debugging matériel
   Serial.println("Scanning I2C bus for devices...");
+  i2cDeviceCount = 0;
   for (uint8_t addr = 1; addr < 127; ++addr) {
     Wire.beginTransmission(addr);
     uint8_t err = Wire.endTransmission();
     if (err == 0) {
       Serial.printf(" - Found I2C device at 0x%02X\n", addr);
+      if (i2cDeviceCount < (int)(sizeof(i2cDevices))) {
+        i2cDevices[i2cDeviceCount++] = addr;
+      }
     }
   }
   Serial.println("I2C scan complete.");
@@ -220,6 +228,23 @@ void setup() {
     doc["sys"]["backlight"] = autoBrightnessMode ? "Auto" : "Max";
     doc["alert"] = alertActive;
     
+    String response; serializeJson(doc, response);
+    request->send(200, "application/json", response);
+  });
+
+  // Debug endpoint: retourne l'état des capteurs et la liste d'adresses I2C détectées
+  server.on("/api/debug", HTTP_GET, [](AsyncWebServerRequest *request){
+    DynamicJsonDocument doc(1024);
+    doc["version"] = PROJECT_VERSION;
+    doc["ahtAvailable"] = ahtAvailable;
+    doc["bmpAvailable"] = bmpAvailable;
+    doc["i2c_count"] = i2cDeviceCount;
+    JsonArray arr = doc.createNestedArray("i2c_devices");
+    for (int i = 0; i < i2cDeviceCount; i++) arr.add(i2cDevices[i]);
+    JsonObject pins = doc.createNestedObject("pins");
+    pins["sda"] = PIN_I2C_SDA;
+    pins["scl"] = PIN_I2C_SCL;
+
     String response; serializeJson(doc, response);
     request->send(200, "application/json", response);
   });
