@@ -2,6 +2,17 @@
 
 All notable changes to this project are documented in this file.
 
+## [2.8.4] - 2025-11-24
+### Patch: Web interface and weather update interval
+- **Web page:** Fixed web page displaying nothing due to corrupted duplicate code in `web_page.h`
+  - Removed duplicate code and rebuilt complete page
+  - Improved interface with diagnostics section and API tests
+  - Added buttons to refresh diagnostics and display I2C devices
+- **Weather interval:** Reduced weather update interval from 15 minutes to 2 minutes
+  - `INTERVAL_WEATHER` changed from 900000 ms (15 min) to 120000 ms (2 min)
+  - Enables more frequent weather data updates
+- **Stability:** Improved system responsiveness with more frequent updates
+
 ## [2.8.3] - 2025-11-24
 ### Patch: I2C sensor initialization robustness
 - **AHT20 handling:** Added an `ahtAvailable` flag and guarded AHT20 reads to avoid I2C errors when the sensor is absent or fails to initialize.

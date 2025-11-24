@@ -58,7 +58,7 @@
 
 // ================= TIMERS (ms) =================
 #define INTERVAL_SENSORS    5000
-#define INTERVAL_WEATHER    900000 
+#define INTERVAL_WEATHER    120000  // 2 minutes (changé de 900000 / 15 min)
 #define INTERVAL_TELEGRAM   3000   
 #define INTERVAL_DISPLAY    250    
 

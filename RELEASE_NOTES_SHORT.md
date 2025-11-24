@@ -1,12 +1,13 @@
-# Release v2.8.3 — Short Notes
+# Release v2.8.4 — Short Notes
 
 ## English summary
 
-v2.8.3 — Patch: I2C sensor initialization robustness
+v2.8.4 — Patch: Web interface and weather update interval
 
-- Added a guard for the AHT20 sensor (`ahtAvailable`) and protected I2C reads when the sensor is absent or fails to initialise.
-- Prevents the runtime I2C error: `requestFrom(): i2cRead returned Error -1`.
-- Project version bumped to `2.8.3` and user-facing docs updated.
+- Fixed web page displaying nothing due to corrupted duplicate code in `web_page.h`
+- Reduced weather update interval from 15 minutes to 2 minutes (`INTERVAL_WEATHER`: 900000 → 120000 ms)
+- Improved web interface with diagnostics section and API test buttons
+- Project version bumped to `2.8.4` and user-facing docs updated.
 
 ## Instructions (short)
 
@@ -34,11 +35,12 @@ platformio run
 
 ## Résumé (Français)
 
-v2.8.3 — Correctif : Robustesse initialisation I2C
+v2.8.4 — Correctif : Interface web et intervalle de mise à jour météo
 
-- Ajout d'une protection pour le capteur AHT20 (`ahtAvailable`) et des lectures I2C conditionnelles si le capteur est absent ou échoue à l'initialisation.
-- Évite l'erreur runtime I2C : `requestFrom(): i2cRead returned Error -1`.
-- Numéro de version du projet mis à jour en `2.8.3` et documentation utilisateur synchronisée.
+- Correction de la page web qui n'affichait rien à cause d'une duplication de code corrompue dans `web_page.h`
+- Réduction de l'intervalle de mise à jour météo de 15 minutes à 2 minutes (`INTERVAL_WEATHER` : 900000 → 120000 ms)
+- Amélioration de l'interface web avec section diagnostics et boutons de tests API
+- Numéro de version du projet mis à jour en `2.8.4` et documentation utilisateur synchronisée.
 
 ## Instructions (court)
 

@@ -1,5 +1,16 @@
 # Historique des Versions (Changelog)
 
+## [2.8.4] - 2025-11-24
+### Correctif : Interface web et intervalle de mise à jour météo
+- **Page web :** Correction de la page web qui n'affichait rien à cause d'une duplication de code corrompue dans `web_page.h`
+  - Suppression du code dupliqué et reconstruction de la page complète
+  - Amélioration de l'interface avec section diagnostics et tests API
+  - Ajout de boutons pour rafraîchir les diagnostics et afficher les périphériques I2C
+- **Intervalle météo :** Réduction de l'intervalle de mise à jour météo de 15 minutes à 2 minutes
+  - `INTERVAL_WEATHER` passé de 900000 ms (15 min) à 120000 ms (2 min)
+  - Permet une actualisation plus fréquente des données météo
+- **Stabilité :** Amélioration de la réactivité du système avec des mises à jour plus fréquentes
+
 ## [2.8.3] - 2025-11-24
 ### Correctif : Robustesse initialisation I2C
 - **AHT20 :** Ajout d'un flag `ahtAvailable` et protection des lectures AHT20 si le capteur n'est pas présent ou échoue à l'initialisation.
