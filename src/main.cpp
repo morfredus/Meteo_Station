@@ -46,6 +46,9 @@ unsigned long lastPressureTime = 0;
 bool autoBrightnessMode = true;
 bool bmpAvailable = false;  // Track si BMP280 est disponible 
 bool ahtAvailable = false;  // Track si AHT20 est disponible
+// Log helper for missing AHT20 to avoid spamming the serial
+unsigned long lastAhtWarn = 0;
+const unsigned long AHT_WARN_INTERVAL = 300000; // 5 minutes
 
 struct WeatherData {
   float temp = 0.0;
@@ -154,6 +157,18 @@ void setup() {
   pixels.show();
 
   Wire.begin(PIN_I2C_SDA, PIN_I2C_SCL);
+  // I2C bus scan: lister les adresses détectées pour debugging matériel
+  Serial.println("Scanning I2C bus for devices...");
+  for (uint8_t addr = 1; addr < 127; ++addr) {
+    Wire.beginTransmission(addr);
+    uint8_t err = Wire.endTransmission();
+    if (err == 0) {
+      Serial.printf(" - Found I2C device at 0x%02X\n", addr);
+    }
+  }
+  Serial.println("I2C scan complete.");
+  // Reset last warn to force an immediate message if AHT missing
+  lastAhtWarn = 0 - AHT_WARN_INTERVAL;
   
   tft.init(TFT_WIDTH, TFT_HEIGHT);
   tft.setRotation(TFT_ROTATION);
@@ -889,6 +904,12 @@ void updateSensors() {
   } else {
     // Marquer comme non disponible
     localSensor.temp = NAN; localSensor.hum = NAN;
+    // Log périodique pour aider le debugging matériel (toutes les 5 minutes)
+    unsigned long now = millis();
+    if (now - lastAhtWarn > AHT_WARN_INTERVAL) {
+      Serial.println("AHT20 still not available — skipping temperature/humidity readings.");
+      lastAhtWarn = now;
+    }
   }
 
   // Lire la pression seulement si BMP280 est disponible
