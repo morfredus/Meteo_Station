@@ -1,4 +1,4 @@
-# Dernière version : **v2.6.4** — Fournisseur AQI changé vers Open‑Meteo Air Quality (gratuit, sans clé API).
+# Dernière version : **v2.8.5** — Intervalle météo optimisé (15 min), support langue française et endpoint scan I2C.
 
 # Contribuer
 

@@ -1,6 +1,6 @@
 # Architecture du Projet
 
-Dernière version : **v2.6.4** — Fournisseur AQI changé vers Open‑Meteo Air Quality (gratuit, sans clé API). Le projet utilise toujours les forks réseau stables.
+Dernière version : **v2.8.5** — Intervalle météo optimisé (15 min), support langue française et endpoint scan I2C. Le projet utilise OpenWeatherMap comme source principale avec fallback sur Open-Meteo.
 
 Ce document donne un aperçu de l'architecture logicielle de la station météo.
 

@@ -2,6 +2,19 @@
 
 All notable changes to this project are documented in this file.
 
+## [2.8.5] - 2025-11-24
+### Patch: Weather interval, language support and I2C scan endpoint
+- **Weather interval:** Reverted to 15 minutes (900000 ms) for INTERVAL_WEATHER
+  - The 2-minute interval was too frequent, returning to optimal previous value
+- **French language:** Added `lang=fr` parameter to OpenWeatherMap APIs
+  - Added to current weather API (`/data/2.5/weather`)
+  - Added to forecast API (`/data/2.5/forecast`)
+  - Ensures data is received in French (already present on One Call API)
+- **I2C endpoint:** Implemented `/api/scan` endpoint (POST)
+  - Allows manual triggering of I2C scan from web interface
+  - Returns list of detected devices in JSON format
+  - Improves hardware diagnostic capabilities
+
 ## [2.8.4] - 2025-11-24
 ### Patch: Web interface and weather update interval
 - **Web page:** Fixed web page displaying nothing due to corrupted duplicate code in `web_page.h`

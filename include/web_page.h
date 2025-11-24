@@ -120,10 +120,11 @@ const char index_html[] PROGMEM = R"rawliteral(
       <div style="text-align:left; font-size:0.85rem; color:#bbb;">
         <div><strong>GET</strong> <a href="/api/data" target="_blank">/api/data</a> — JSON capteurs & météo</div>
         <div style="margin-top:6px;"><strong>GET</strong> <a href="/api/debug" target="_blank">/api/debug</a> — état capteurs, I2C</div>
+        <div style="margin-top:6px;"><strong>POST</strong> /api/scan — scan I2C manuel (voir bouton ci-contre)</div>
         <div style="margin-top:8px;">Exemples (terminal):</div>
         <pre style="background:#111; color:#9f9; padding:8px; border-radius:6px; font-size:0.85rem;">curl http://DEVICE_IP/api/data
-curl http://DEVICE_IP/api/debug</pre>
-        <div style="margin-top:6px; color:#888; font-size:0.85rem;">Remarque: `/api/scan` n'est pas encore implémenté par défaut (si besoin, je peux l'ajouter).</div>
+curl http://DEVICE_IP/api/debug
+curl -X POST http://DEVICE_IP/api/scan</pre>
       </div>
     </div>
 
@@ -183,6 +184,16 @@ curl http://DEVICE_IP/api/debug</pre>
             document.getElementById('f3max').innerText = safeFixed(f[2].max,0); document.getElementById('f3min').innerText = safeFixed(f[2].min,0);
         }
         document.getElementById('uptime').innerText = data.sys ? (data.sys.uptime || '--') : '--';
+        
+        // Gestion des alertes
+        const alertPanel = document.getElementById('alertPanel');
+        const alertMsg = document.getElementById('alertMsg');
+        if (data.alert && data.alert.active) {
+          alertPanel.style.display = 'block';
+          alertMsg.innerText = data.alert.message || 'Alerte active';
+        } else {
+          alertPanel.style.display = 'none';
+        }
       })
       .catch(err => console.error('updateData error', err));
   }

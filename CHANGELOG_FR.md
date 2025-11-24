@@ -1,5 +1,18 @@
 # Historique des Versions (Changelog)
 
+## [2.8.5] - 2025-11-24
+### Correctif : Intervalle météo, langue et endpoint scan I2C
+- **Intervalle météo :** Retour à l'intervalle de 15 minutes (900000 ms) pour INTERVAL_WEATHER
+  - L'intervalle de 2 minutes était trop fréquent, retour à la valeur optimale précédente
+- **Langue française :** Ajout du paramètre `lang=fr` aux API OpenWeatherMap
+  - Ajouté à l'API météo actuelle (`/data/2.5/weather`)
+  - Ajouté à l'API prévisions (`/data/2.5/forecast`)
+  - Garantit la réception des données en français (déjà présent sur One Call API)
+- **Endpoint I2C :** Implémentation de l'endpoint `/api/scan` (POST)
+  - Permet de déclencher manuellement un scan I2C depuis l'interface web
+  - Retourne la liste des périphériques détectés au format JSON
+  - Améliore les capacités de diagnostic matériel
+
 ## [2.8.4] - 2025-11-24
 ### Correctif : Interface web et intervalle de mise à jour météo
 - **Page web :** Correction de la page web qui n'affichait rien à cause d'une duplication de code corrompue dans `web_page.h`

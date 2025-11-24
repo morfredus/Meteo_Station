@@ -226,7 +226,8 @@ void setup() {
     doc["gps"]["sats"] = currentGPS.sats;
     doc["sys"]["uptime"] = getUptime();
     doc["sys"]["backlight"] = autoBrightnessMode ? "Auto" : "Max";
-    doc["alert"] = alertActive;
+    doc["alert"]["active"] = alertActive;
+    doc["alert"]["message"] = alertMessage;
     
     String response; serializeJson(doc, response);
     request->send(200, "application/json", response);
@@ -244,6 +245,30 @@ void setup() {
     JsonObject pins = doc.createNestedObject("pins");
     pins["sda"] = PIN_I2C_SDA;
     pins["scl"] = PIN_I2C_SCL;
+
+    String response; serializeJson(doc, response);
+    request->send(200, "application/json", response);
+  });
+
+  // Scan endpoint: déclenche un nouveau scan I2C et retourne les résultats
+  server.on("/api/scan", HTTP_POST, [](AsyncWebServerRequest *request){
+    Serial.println("Manual I2C scan requested via /api/scan");
+    i2cDeviceCount = 0;
+    for (uint8_t addr = 1; addr < 127; ++addr) {
+      Wire.beginTransmission(addr);
+      uint8_t err = Wire.endTransmission();
+      if (err == 0) {
+        if (i2cDeviceCount < (int)(sizeof(i2cDevices))) {
+          i2cDevices[i2cDeviceCount++] = addr;
+        }
+      }
+    }
+
+    DynamicJsonDocument doc(512);
+    doc["status"] = "scan_complete";
+    doc["i2c_count"] = i2cDeviceCount;
+    JsonArray arr = doc.createNestedArray("i2c_devices");
+    for (int i = 0; i < i2cDeviceCount; i++) arr.add(i2cDevices[i]);
 
     String response; serializeJson(doc, response);
     request->send(200, "application/json", response);
@@ -594,7 +619,7 @@ bool fetchOpenWeatherMap() {
     // ========================================
     String urlWeather = String("http://api.openweathermap.org/data/2.5/weather?lat=") +
                         String(latToUse, 4) + "&lon=" + String(lonToUse, 4) +
-                        "&units=metric&appid=" + OPENWEATHER_API_KEY;
+                        "&units=metric&lang=fr&appid=" + OPENWEATHER_API_KEY;
 
     Serial.println("Weather URL: " + urlWeather);
     http.begin(urlWeather);
@@ -637,7 +662,7 @@ bool fetchOpenWeatherMap() {
     // ========================================
     String urlForecast = String("http://api.openweathermap.org/data/2.5/forecast?lat=") +
                          String(latToUse, 4) + "&lon=" + String(lonToUse, 4) +
-                         "&units=metric&appid=" + OPENWEATHER_API_KEY;
+                         "&units=metric&lang=fr&appid=" + OPENWEATHER_API_KEY;
 
     Serial.println("Forecast URL: " + urlForecast);
     http.begin(urlForecast);
