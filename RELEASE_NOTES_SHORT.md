@@ -1,11 +1,12 @@
-# Release v2.6.4 — Short Notes
+# Release v2.8.3 — Short Notes
 
 ## English summary
 
-v2.6.0 — Reliability improvement (AQI provider change)
+v2.8.3 — Patch: I2C sensor initialization robustness
 
-- Switched the air-quality data provider to **Open‑Meteo Air Quality API** (free, no API key required) to improve AQI reliability.
-- Documentation updated across repository to reflect v2.6.0.
+- Added a guard for the AHT20 sensor (`ahtAvailable`) and protected I2C reads when the sensor is absent or fails to initialise.
+- Prevents the runtime I2C error: `requestFrom(): i2cRead returned Error -1`.
+- Project version bumped to `2.8.3` and user-facing docs updated.
 
 ## Instructions (short)
 
@@ -33,10 +34,11 @@ platformio run
 
 ## Résumé (Français)
 
-v2.6.0 — Amélioration de la fiabilité (changement du fournisseur AQI)
+v2.8.3 — Correctif : Robustesse initialisation I2C
 
-- Changement du fournisseur de qualité de l'air vers **Open‑Meteo Air Quality API** (gratuit, sans clé API) pour améliorer la fiabilité des valeurs AQI.
-- Documentation mise à jour dans le dépôt pour refléter v2.6.0.
+- Ajout d'une protection pour le capteur AHT20 (`ahtAvailable`) et des lectures I2C conditionnelles si le capteur est absent ou échoue à l'initialisation.
+- Évite l'erreur runtime I2C : `requestFrom(): i2cRead returned Error -1`.
+- Numéro de version du projet mis à jour en `2.8.3` et documentation utilisateur synchronisée.
 
 ## Instructions (court)
 

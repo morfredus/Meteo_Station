@@ -2,6 +2,15 @@
 
 All notable changes to this project are documented in this file.
 
+## [2.8.3] - 2025-11-24
+### Patch: I2C sensor initialization robustness
+- **AHT20 handling:** Added an `ahtAvailable` flag and guarded AHT20 reads to avoid I2C errors when the sensor is absent or fails to initialize.
+  - Prevents runtime error: `[E][Wire.cpp:513] requestFrom(): i2cRead returned Error -1`.
+  - When AHT20 is missing, temperature and humidity are marked as `NAN` and the system continues operating.
+- **Version bump:** Project version set to `2.8.3` and user-facing docs updated.
+- **Build:** Verified PlatformIO build succeeds after changes.
+
+## [2.8.2] - 2025-11-24
 ## [2.8.2] - 2025-11-24
 ### Patch: I2C error fix and weather alerts reactivation
 - **I2C Error:** Fixed `i2cRead returned Error -1` issue

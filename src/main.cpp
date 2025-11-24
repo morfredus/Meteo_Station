@@ -45,6 +45,7 @@ float pressureHistory = 0.0;
 unsigned long lastPressureTime = 0;
 bool autoBrightnessMode = true;
 bool bmpAvailable = false;  // Track si BMP280 est disponible 
+bool ahtAvailable = false;  // Track si AHT20 est disponible
 
 struct WeatherData {
   float temp = 0.0;
@@ -856,7 +857,15 @@ void drawStartupScreen() {
 }
 
 void initSensors() {
-    if(!aht.begin()) Serial.println("AHT20 ERROR");
+  // Initialisation AHT20
+  ahtAvailable = aht.begin();
+  if(!ahtAvailable) {
+    Serial.println("AHT20 ERROR - Temperature/Humidity disabled");
+    localSensor.temp = NAN;
+    localSensor.hum = NAN;
+  } else {
+    Serial.println("AHT20 OK");
+  }
 
     // Essayer d'initialiser BMP280 aux deux adresses possibles
     bmpAvailable = bmp.begin(0x76) || bmp.begin(0x77);
@@ -873,8 +882,14 @@ void initSensors() {
 }
 
 void updateSensors() {
-  sensors_event_t h, t; aht.getEvent(&h, &t);
-  localSensor.temp = t.temperature; localSensor.hum = h.relative_humidity;
+  // Lire AHT20 seulement si disponible
+  if (ahtAvailable) {
+    sensors_event_t h, t; aht.getEvent(&h, &t);
+    localSensor.temp = t.temperature; localSensor.hum = h.relative_humidity;
+  } else {
+    // Marquer comme non disponible
+    localSensor.temp = NAN; localSensor.hum = NAN;
+  }
 
   // Lire la pression seulement si BMP280 est disponible
   if (bmpAvailable) {

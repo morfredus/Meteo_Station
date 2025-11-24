@@ -1,5 +1,12 @@
 # Historique des Versions (Changelog)
 
+## [2.8.3] - 2025-11-24
+### Correctif : Robustesse initialisation I2C
+- **AHT20 :** Ajout d'un flag `ahtAvailable` et protection des lectures AHT20 si le capteur n'est pas présent ou échoue à l'initialisation.
+  - Évite l'erreur runtime I2C : `requestFrom(): i2cRead returned Error -1`.
+  - Température/humidité marquées `NAN` si capteur absent, le système continue de fonctionner.
+- **Bump version :** Passage en `2.8.3` et mise à jour des docs utilisateur.
+
 ## [2.8.2] - 2025-11-24
 ### Correctif : Erreur I2C et réactivation des alertes météo
 - **Erreur I2C :** Correction de l'erreur `i2cRead returned Error -1`
