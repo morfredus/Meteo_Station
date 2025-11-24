@@ -2,6 +2,19 @@
 
 All notable changes to this project are documented in this file.
 
+## [2.8.1] - 2025-11-24
+### Patch: Forecast calculation and debugging logs
+- **Forecasts:** Fixed daily min/max calculation (999/-999 values corrected)
+  - New calculation based on indices: 8 forecasts (3h) = 1 day
+  - Index 0-7: Today, 8-15: Tomorrow, 16-23: Day+2, 24-31: Day+3
+  - Detailed logs for each forecast item for diagnosis
+- **Debugging:** Added startup logs to verify:
+  - WiFi status before weather fetch
+  - SSID and IP if connected
+  - Confirmation of fetchWeather() call and completion
+  - Confirmation of updateSensors() call and completion
+- **Stability:** Resolved incorrect value display issue (999)
+
 ## [2.8.0] - 2025-11-24
 ### Major Change: Migration to Free OpenWeatherMap APIs
 - **OpenWeatherMap API:** Complete migration to free APIs:

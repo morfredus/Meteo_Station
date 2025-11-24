@@ -1,5 +1,18 @@
 # Historique des Versions (Changelog)
 
+## [2.8.1] - 2025-11-24
+### Correctif : Calcul des prévisions et logs de débogage
+- **Prévisions :** Correction du calcul des min/max par jour (valeurs 999/-999 corrigées)
+  - Nouveau calcul basé sur les index : 8 prévisions 3h = 1 jour
+  - Index 0-7: Aujourd'hui, 8-15: Demain, 16-23: J+2, 24-31: J+3
+  - Logs détaillés de chaque prévision pour diagnostic
+- **Débogage :** Ajout de logs au démarrage pour vérifier :
+  - Statut WiFi avant récupération météo
+  - SSID et IP si connecté
+  - Confirmation d'appel et de complétion de fetchWeather()
+  - Confirmation d'appel et de complétion de updateSensors()
+- **Stabilité :** Résolution du problème d'affichage de valeurs incorrectes (999)
+
 ## [2.8.0] - 2025-11-24
 ### Changement Majeur : Migration vers API OpenWeatherMap Gratuite
 - **API OpenWeatherMap :** Migration complète vers les API gratuites :

@@ -214,8 +214,19 @@ void setup() {
   Serial.printf("Lat: %.4f, Lon: %.4f\n", currentGPS.lat, currentGPS.lon);
   Serial.println("===============================\n");
 
+  Serial.println("\n=== Initial Weather Fetch ===");
+  Serial.printf("WiFi Status: %s\n", WiFi.status() == WL_CONNECTED ? "Connected" : "Not Connected");
+  if (WiFi.status() == WL_CONNECTED) {
+    Serial.printf("WiFi SSID: %s\n", WiFi.SSID().c_str());
+    Serial.printf("WiFi IP: %s\n", WiFi.localIP().toString().c_str());
+  }
+  Serial.println("Calling fetchWeather()...");
   fetchWeather();
+  Serial.println("fetchWeather() completed\n");
+
+  Serial.println("Calling updateSensors()...");
   updateSensors();
+  Serial.println("updateSensors() completed\n");
 
   tft.fillScreen(C_BLACK);
   drawFullPage();
@@ -606,33 +617,33 @@ bool fetchOpenWeatherMap() {
             JsonArray list = docForecast["list"].as<JsonArray>();
             Serial.printf("Forecast items: %d\n", list.size());
 
-            // Organiser les données par jour
-            float dayMin[4] = {999, 999, 999, 999};  // 4 jours (aujourd'hui + 3)
+            // Organiser les données par jour (8 prévisions = 1 jour)
+            // Index 0-7: Aujourd'hui, 8-15: Demain, 16-23: J+2, 24-31: J+3
+            float dayMin[4] = {999, 999, 999, 999};
             float dayMax[4] = {-999, -999, -999, -999};
             int dayCode[4] = {0, 0, 0, 0};
-            int dayCount[4] = {0, 0, 0, 0};
 
             // Parcourir toutes les prévisions 3h
-            for (int i = 0; i < list.size() && i < 40; i++) {  // max 40 items (5 jours)
+            for (int i = 0; i < list.size() && i < 32; i++) {
                 JsonObject item = list[i].as<JsonObject>();
 
-                // Calculer le jour (0=aujourd'hui, 1=demain, etc.)
-                long dt = item["dt"].as<long>();
-                int dayIndex = (dt / 86400) - (millis()/1000 / 86400);  // Approximation
-                if (dayIndex < 0) dayIndex = 0;
-                if (dayIndex > 3) continue;
+                // Calculer le jour (8 prévisions = 1 jour)
+                int dayIndex = i / 8;
+                if (dayIndex > 3) break;
 
                 float temp = item["main"]["temp"].as<float>();
                 int code = item["weather"][0]["id"].as<int>();
 
+                // Mise à jour min/max
                 if (temp < dayMin[dayIndex]) dayMin[dayIndex] = temp;
                 if (temp > dayMax[dayIndex]) dayMax[dayIndex] = temp;
 
-                // Prendre le code météo du milieu de la journée
-                if (dayCount[dayIndex] == 4) {  // ~12h (4 * 3h)
+                // Prendre le code météo du milieu de la journée (index 4 = ~12h)
+                if ((i % 8) == 4) {
                     dayCode[dayIndex] = mapOWMtoWMO(code);
                 }
-                dayCount[dayIndex]++;
+
+                Serial.printf("Item %d: Day=%d, Temp=%.1f, Code=%d\n", i, dayIndex, temp, code);
             }
 
             // Stocker les prévisions pour J+1, J+2, J+3
@@ -641,8 +652,8 @@ bool fetchOpenWeatherMap() {
                 apiWeather.forecastMax[i] = dayMax[i+1];
                 apiWeather.forecastCode[i] = dayCode[i+1];
 
-                Serial.printf("Day %d: Min=%.1f, Max=%.1f, Code=%d\n",
-                             i+1, dayMin[i+1], dayMax[i+1], dayCode[i+1]);
+                Serial.printf("FINAL Day %d: Min=%.1f, Max=%.1f, Code=%d\n",
+                             i+1, apiWeather.forecastMin[i], apiWeather.forecastMax[i], apiWeather.forecastCode[i]);
             }
 
         } else {
