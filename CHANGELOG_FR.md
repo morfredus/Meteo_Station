@@ -1,5 +1,16 @@
 # Historique des Versions (Changelog)
 
+## [2.7.1] - 2025-11-24
+### Correctif : Alertes Météo et Débogage OpenWeatherMap
+- **Page Alertes :** Modification de l'affichage "NOMINAL" → "AUCUNE" pour plus de clarté quand aucune alerte n'est active.
+- **OpenWeatherMap :** Ajout de logs de débogage complets pour diagnostiquer les problèmes de récupération des alertes :
+  - Affichage des coordonnées GPS utilisées (valides ou par défaut)
+  - Logs détaillés de la requête HTTP et de la réponse JSON
+  - Vérification explicite de la présence d'alertes dans la réponse
+  - Comptage du nombre d'alertes trouvées
+- **Coordonnées :** Utilisation explicite des coordonnées GPS valides ou des coordonnées par défaut de Bordeaux (44.8378, -0.5792).
+- **Priorité API :** Confirmation qu'OpenWeatherMap est toujours utilisé en priorité pour obtenir les alertes météo officielles.
+
 ## [2.7.0] - 2025-11-24
 ### Amélioration Majeure : Réorganisation des Pages
 - **Navigation :** Réorganisation complète de l'ordre des pages pour une meilleure expérience utilisateur.

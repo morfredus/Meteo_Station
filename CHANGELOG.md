@@ -2,6 +2,17 @@
 
 All notable changes to this project are documented in this file.
 
+## [2.7.1] - 2025-11-24
+### Patch: Weather Alerts and OpenWeatherMap Debugging
+- **Alerts Page:** Changed display from "NOMINAL" → "AUCUNE" (NONE) for better clarity when no alerts are active.
+- **OpenWeatherMap:** Added comprehensive debugging logs to diagnose alert retrieval issues:
+  - Display GPS coordinates used (valid or default)
+  - Detailed HTTP request and JSON response logs
+  - Explicit verification of alerts presence in response
+  - Count of alerts found
+- **Coordinates:** Explicit use of valid GPS coordinates or default Bordeaux coordinates (44.8378, -0.5792).
+- **API Priority:** Confirmation that OpenWeatherMap is always used first to obtain official weather alerts.
+
 ## [2.7.0] - 2025-11-24
 ### Major Improvement: Page Reorganization
 - **Navigation:** Complete reorganization of page order for improved user experience.

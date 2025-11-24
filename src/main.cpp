@@ -209,9 +209,14 @@ void setup() {
   
   server.begin();
 
+  Serial.println("\n=== Initial GPS Coordinates ===");
+  Serial.printf("GPS Valid: %s\n", currentGPS.isValid ? "Yes" : "No (using defaults)");
+  Serial.printf("Lat: %.4f, Lon: %.4f\n", currentGPS.lat, currentGPS.lon);
+  Serial.println("===============================\n");
+
   fetchWeather();
   updateSensors();
-  
+
   tft.fillScreen(C_BLACK);
   drawFullPage();
 }
@@ -482,62 +487,126 @@ String getUptime() {
 }
 
 void fetchWeather() {
-    if (wifiMulti.run() != WL_CONNECTED) return;
-    tft.fillRect(210, 5, 20, 20, C_BLUE); 
+    if (wifiMulti.run() != WL_CONNECTED) {
+        Serial.println("WiFi not connected, skipping weather update");
+        return;
+    }
+
+    tft.fillRect(210, 5, 20, 20, C_BLUE);
     tft.setCursor(215, 5); tft.setTextColor(C_YELLOW); tft.setTextSize(1); tft.print("DL");
 
-    Serial.println("--- Fetching Weather ---");
+    Serial.println("\n==============================");
+    Serial.println("=== Fetching Weather Data ===");
+    Serial.println("==============================");
+
+    // PRIORITE 1: OpenWeatherMap (pour les alertes et données complètes)
     bool successOWM = fetchOpenWeatherMap();
-    if (successOWM) apiWeather.provider = "OpenWeatherMap";
-    else {
-        Serial.println("OWM Failed, Trying OpenMeteo...");
-        if (fetchOpenMeteo()) apiWeather.provider = "Open-Meteo";
-        else apiWeather.provider = "Erreur Reseau";
+    if (successOWM) {
+        apiWeather.provider = "OpenWeatherMap";
+        Serial.println("✓ OpenWeatherMap: SUCCESS");
+    } else {
+        Serial.println("✗ OpenWeatherMap: FAILED");
+        Serial.println("Trying fallback: Open-Meteo...");
+        if (fetchOpenMeteo()) {
+            apiWeather.provider = "Open-Meteo";
+            Serial.println("✓ Open-Meteo: SUCCESS (fallback)");
+        } else {
+            apiWeather.provider = "Erreur Reseau";
+            Serial.println("✗ Open-Meteo: FAILED");
+        }
     }
-    
-    // APPEL DE LA NOUVELLE FONCTION AQI (OPEN METEO)
+
+    // APPEL DE LA FONCTION AQI (OPEN METEO)
     Serial.println("--- Fetching AQI (Open-Meteo) ---");
-    fetchAQI_OpenMeteo(); 
-    
+    fetchAQI_OpenMeteo();
+
+    Serial.printf("Final provider: %s\n", apiWeather.provider.c_str());
+    Serial.println("==============================\n");
+
     tft.fillRect(210, 5, 20, 20, C_BLUE);
 }
 
 bool fetchOpenWeatherMap() {
     HTTPClient http; http.setTimeout(4000);
-    String url = String("https://api.openweathermap.org/data/2.5/onecall?lat=") + 
-                 String(currentGPS.lat, 4) + "&lon=" + String(currentGPS.lon, 4) + 
+
+    // Utiliser coordonnées GPS ou coordonnées par défaut
+    float latToUse = currentGPS.isValid ? currentGPS.lat : 44.8378;
+    float lonToUse = currentGPS.isValid ? currentGPS.lon : -0.5792;
+
+    String url = String("https://api.openweathermap.org/data/2.5/onecall?lat=") +
+                 String(latToUse, 4) + "&lon=" + String(lonToUse, 4) +
                  "&exclude=minutely,hourly&units=metric&appid=" + OPENWEATHER_API_KEY;
+
+    Serial.println("=== OpenWeatherMap Request ===");
+    Serial.printf("Coordinates: %.4f, %.4f (GPS: %s)\n", latToUse, lonToUse, currentGPS.isValid ? "Valid" : "Default");
+    Serial.println("URL: " + url);
+
     http.begin(url);
     int code = http.GET();
+    Serial.printf("HTTP Response Code: %d\n", code);
+
     if (code == 200) {
+        String payload = http.getString();
+        Serial.printf("Payload length: %d bytes\n", payload.length());
+
         JsonDocument doc;
-        if (!deserializeJson(doc, http.getString())) {
+        DeserializationError error = deserializeJson(doc, payload);
+
+        if (!error) {
+            Serial.println("JSON parsed successfully!");
+
+            // Vérifier la présence des données
             apiWeather.temp = doc["current"]["temp"];
             apiWeather.pressureMSL = doc["current"]["pressure"];
             apiWeather.weatherCode = mapOWMtoWMO(doc["current"]["weather"][0]["id"]);
+
+            Serial.printf("Temp: %.1f C, Pressure: %.1f hPa, Code: %d\n",
+                         apiWeather.temp, apiWeather.pressureMSL, apiWeather.weatherCode);
+
             for(int i=0; i<3; i++) {
                 apiWeather.forecastMin[i] = doc["daily"][i+1]["temp"]["min"];
                 apiWeather.forecastMax[i] = doc["daily"][i+1]["temp"]["max"];
                 apiWeather.forecastCode[i] = mapOWMtoWMO(doc["daily"][i+1]["weather"][0]["id"]);
             }
-            if (doc["alerts"].is<JsonArray>()) {
-              alertActive = true;
-              alertMessage = doc["alerts"][0]["event"].as<String>();
-              // Force l'affichage immédiat de la page d'alerte
-              lastAlertActive = false; // permettre la transition
-              currentPage = 3;
-              beep(5, 100);
-              drawFullPage();
-              refreshDisplayData();
+
+            // Vérification des alertes
+            Serial.print("Checking alerts... ");
+            if (doc.containsKey("alerts") && doc["alerts"].is<JsonArray>()) {
+              JsonArray alerts = doc["alerts"].as<JsonArray>();
+              Serial.printf("Found %d alert(s)!\n", alerts.size());
+
+              if (alerts.size() > 0) {
+                  alertActive = true;
+                  alertMessage = doc["alerts"][0]["event"].as<String>();
+                  Serial.println("Alert: " + alertMessage);
+
+                  // Force l'affichage immédiat de la page d'alerte
+                  lastAlertActive = false; // permettre la transition
+                  currentPage = 3;
+                  beep(5, 100);
+                  drawFullPage();
+                  refreshDisplayData();
+              }
             } else {
+              Serial.println("No alerts found in response");
               // Pas d'alerte météo renvoyée -> on réinitialise proprement
               alertActive = false;
               alertMessage = "Aucune alerte";
             }
-            http.end(); return true;
+            http.end();
+            return true;
+        } else {
+            Serial.print("JSON parsing failed: ");
+            Serial.println(error.c_str());
+        }
+    } else {
+        Serial.printf("HTTP request failed with code: %d\n", code);
+        if (code > 0) {
+            Serial.println("Response: " + http.getString());
         }
     }
-    http.end(); return false;
+    http.end();
+    return false;
 }
 
 bool fetchOpenMeteo() {
@@ -805,8 +874,8 @@ void refreshDisplayData() {
           tft.setCursor(10, 105); tft.setTextSize(1); tft.setTextColor(C_WHITE); tft.print(cleanText(alertMessage));
           tft.fillCircle(200, 165, 30, C_RED); tft.setTextColor(C_WHITE); tft.setCursor(192, 156); tft.setTextSize(3); tft.print("!");
       } else {
-          tft.setCursor(10, 100); tft.setTextColor(C_GREEN); tft.setTextSize(2); tft.print("NOMINAL");
-          tft.setCursor(10, 125); tft.setTextSize(1); tft.setTextColor(C_GREY); tft.print("Aucune alerte");
+          tft.setCursor(10, 100); tft.setTextColor(C_GREEN); tft.setTextSize(2); tft.print("AUCUNE");
+          tft.setCursor(10, 125); tft.setTextSize(1); tft.setTextColor(C_GREY); tft.print("Aucune alerte active");
           tft.fillCircle(200, 165, 30, C_GREEN); tft.setTextColor(C_BLACK); tft.setCursor(186, 156); tft.setTextSize(2); tft.print("OK");
       }
   }
