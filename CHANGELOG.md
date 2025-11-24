@@ -2,21 +2,6 @@
 
 All notable changes to this project are documented in this file.
 
-## [2.7.0] - 2025-11-24
-### Major Improvement: Page Reorganization
-- **Navigation:** Complete reorganization of page order for improved user experience.
-  - **Page 0:** Summary (unchanged)
-  - **Page 1:** Forecast (formerly page 2)
-  - **Page 2:** Environment (formerly page 1)
-  - **Page 3:** **NEW** - Weather Alerts (dedicated page)
-  - **Page 4:** GPS Data (formerly page 3)
-  - **Page 5:** Network & System (formerly page 4)
-  - **Page 6:** System Status (formerly page 5)
-- **Alerts:** New dedicated page for weather alerts with improved visual display.
-  - Displays real-time alerts from OpenWeatherMap.
-  - Optimized visual interface with red alert icon or green nominal status.
-- **UX:** More logical page order: Summary → Forecast → Environment → Alerts → GPS → Network → System.
-
 ## [2.6.4] - 2025-11-23
 ### Patch: Telegram & UX
 - **Telegram:** Send a short startup message at boot; the first full status report is sent automatically when sensor/weather measurements become available.

@@ -1,20 +1,5 @@
 # Historique des Versions (Changelog)
 
-## [2.7.0] - 2025-11-24
-### Amélioration Majeure : Réorganisation des Pages
-- **Navigation :** Réorganisation complète de l'ordre des pages pour une meilleure expérience utilisateur.
-  - **Page 0 :** Résumé (inchangé)
-  - **Page 1 :** Prévisions (anciennement page 2)
-  - **Page 2 :** Environnement (anciennement page 1)
-  - **Page 3 :** **NOUVELLE** - Alertes Météo (page dédiée)
-  - **Page 4 :** Données GPS (anciennement page 3)
-  - **Page 5 :** Réseau & Système (anciennement page 4)
-  - **Page 6 :** État Système (anciennement page 5)
-- **Alertes :** Nouvelle page dédiée aux alertes météorologiques avec affichage visuel amélioré.
-  - Affiche les alertes provenant d'OpenWeatherMap en temps réel.
-  - Interface visuelle optimisée avec icône d'alerte rouge ou statut nominal vert.
-- **UX :** Ordre des pages plus logique : Résumé → Prévisions → Environnement → Alertes → GPS → Réseau → Système.
-
 ## [2.6.4] - 2025-11-23
 -### Correctif : Telegram & UX
 - **Telegram :** Envoi au démarrage d'un message de démarrage court ; le premier rapport complet est envoyé automatiquement lorsque les mesures (capteurs / météo) sont disponibles.
