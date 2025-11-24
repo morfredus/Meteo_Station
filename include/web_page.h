@@ -164,7 +164,7 @@ curl -X POST http://DEVICE_IP/api/scan</pre>
         document.getElementById('inLux').innerText = data.sensor.lux || '--';
         document.getElementById('trend').innerText = data.sensor.trend || '--';
         document.getElementById('outTemp').innerText = safeFixed(data.weather.temp,1);
-        document.getElementById('weatherDesc').innerText = 'Code WMO: ' + (data.weather.code || '--');
+        document.getElementById('weatherDesc').innerText = data.weather.desc || 'Code WMO: ' + (data.weather.code || '--');
         document.getElementById('provider').innerText = data.weather.provider || '--';
         const aqi = data.weather.aqi || 0;
         document.getElementById('aqiVal').innerText = aqi;

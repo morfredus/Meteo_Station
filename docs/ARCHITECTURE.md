@@ -1,6 +1,6 @@
 # Project Architecture
 
-Latest release: **v2.8.5** — Optimized weather interval (15 min), French language support and I2C scan endpoint. The project uses OpenWeatherMap as primary source with Open-Meteo fallback.
+Latest release: **v2.8.6** — French weather descriptions from OpenWeatherMap. The project uses OpenWeatherMap as primary source with Open-Meteo fallback.
 
 This document provides an overview of the software architecture of the Meteo Station.
 

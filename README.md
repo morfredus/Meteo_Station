@@ -1,6 +1,6 @@
 # ESP32 Weather Station (Meteo_Station Project)
 
-**Current Version: 2.8.5** (as of 2025-11-24)
+**Current Version: 2.8.6** (as of 2025-11-24)
 
 Note: v2.6.0 improves reliability by switching the AQI data source to the Open‑Meteo Air Quality API (free, no API key required). The project remains on the stable network library set introduced in the v2.5.x rollback.
 

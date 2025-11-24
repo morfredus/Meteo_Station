@@ -2,6 +2,17 @@
 
 All notable changes to this project are documented in this file.
 
+## [2.8.6] - 2025-11-24
+### Patch: French weather descriptions
+- **Weather descriptions:** Added French weather descriptions from OpenWeatherMap
+  - Added `weatherDesc` field for current weather
+  - Added `forecastDesc[3]` field for 3-day forecasts
+  - Retrieved from `weather[0].description` with `lang=fr` parameter
+- **Display:** Weather descriptions now show in French
+  - Web interface: displays description instead of WMO code
+  - JSON API: added `weather.desc` and `forecast[].desc` fields
+- **User experience:** Improved with readable localized weather information
+
 ## [2.8.5] - 2025-11-24
 ### Patch: Weather interval, language support and I2C scan endpoint
 - **Weather interval:** Reverted to 15 minutes (900000 ms) for INTERVAL_WEATHER

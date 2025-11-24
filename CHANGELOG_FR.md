@@ -1,5 +1,16 @@
 # Historique des Versions (Changelog)
 
+## [2.8.6] - 2025-11-24
+### Correctif : Descriptions météo en français
+- **Descriptions météo :** Ajout des descriptions météo en français depuis OpenWeatherMap
+  - Ajout du champ `weatherDesc` pour la météo actuelle
+  - Ajout du champ `forecastDesc[3]` pour les prévisions sur 3 jours
+  - Récupération depuis `weather[0].description` avec paramètre `lang=fr`
+- **Affichage :** Les descriptions météo s'affichent en français
+  - Interface web : affichage de la description au lieu du code WMO
+  - API JSON : ajout des champs `weather.desc` et `forecast[].desc`
+- **Expérience utilisateur :** Amélioration avec informations localisées lisibles
+
 ## [2.8.5] - 2025-11-24
 ### Correctif : Intervalle météo, langue et endpoint scan I2C
 - **Intervalle météo :** Retour à l'intervalle de 15 minutes (900000 ms) pour INTERVAL_WEATHER

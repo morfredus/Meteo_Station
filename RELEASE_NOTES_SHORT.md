@@ -1,13 +1,14 @@
-# Release v2.8.5 — Short Notes
+# Release v2.8.6 — Short Notes
 
 ## English summary
 
-v2.8.5 — Patch: Weather interval, language support and I2C scan endpoint
+v2.8.6 — Patch: French weather descriptions
 
-- Reverted weather update interval to 15 minutes (INTERVAL_WEATHER: 120000 → 900000 ms)
-- Added `lang=fr` parameter to OpenWeatherMap APIs (current weather & forecast)
-- Implemented `/api/scan` POST endpoint for manual I2C scanning
-- Project version bumped to `2.8.5` and user-facing docs updated.
+- Added French weather descriptions from OpenWeatherMap API
+- Display weather descriptions in French on screen and web interface
+- Added `weatherDesc` and `forecastDesc` fields to API JSON response
+- Improved user experience with localized weather information
+- Project version bumped to `2.8.6` and user-facing docs updated.
 
 ## Instructions (short)
 
@@ -35,12 +36,13 @@ platformio run
 
 ## Résumé (Français)
 
-v2.8.5 — Correctif : Intervalle météo, langue et endpoint scan I2C
+v2.8.6 — Correctif : Descriptions météo en français
 
-- Retour à l'intervalle de mise à jour météo de 15 minutes (INTERVAL_WEATHER : 120000 → 900000 ms)
-- Ajout du paramètre `lang=fr` aux API OpenWeatherMap (météo actuelle & prévisions)
-- Implémentation de l'endpoint `/api/scan` (POST) pour scan I2C manuel
-- Numéro de version du projet mis à jour en `2.8.5` et documentation utilisateur synchronisée.
+- Ajout des descriptions météo en français depuis l'API OpenWeatherMap
+- Affichage des descriptions météo en français sur l'écran et l'interface web
+- Ajout des champs `weatherDesc` et `forecastDesc` à la réponse JSON de l'API
+- Amélioration de l'expérience utilisateur avec informations météo localisées
+- Numéro de version du projet mis à jour en `2.8.6` et documentation utilisateur synchronisée.
 
 ## Instructions (court)
 

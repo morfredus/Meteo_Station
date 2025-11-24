@@ -1,4 +1,4 @@
-# Latest release: **v2.8.5** — Optimized weather interval (15 min), French language support and I2C scan endpoint.
+# Latest release: **v2.8.6** — French weather descriptions from OpenWeatherMap.
 
 # Build & Deploy
 

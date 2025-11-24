@@ -56,11 +56,13 @@ int i2cDeviceCount = 0;
 struct WeatherData {
   float temp = 0.0;
   int weatherCode = 0;
+  String weatherDesc = "--";  // Description en français
   float pressureMSL = 1013.25;
   int aqi = 0; 
   float forecastMax[3] = {0,0,0};
   float forecastMin[3] = {0,0,0};
   int forecastCode[3] = {0,0,0};
+  String forecastDesc[3] = {"--", "--", "--"};  // Descriptions en français
   String provider = "Recherche..."; 
 } apiWeather;
 
@@ -210,6 +212,7 @@ void setup() {
     doc["sensor"]["trend"] = localSensor.trend;
     doc["weather"]["temp"] = apiWeather.temp;
     doc["weather"]["code"] = apiWeather.weatherCode;
+    doc["weather"]["desc"] = apiWeather.weatherDesc;
     doc["weather"]["aqi"] = apiWeather.aqi;
     doc["weather"]["provider"] = apiWeather.provider;
     
@@ -218,6 +221,7 @@ void setup() {
         JsonObject day = f.add<JsonObject>();
         day["min"] = apiWeather.forecastMin[i];
         day["max"] = apiWeather.forecastMax[i];
+        day["desc"] = apiWeather.forecastDesc[i];
     }
     
     doc["gps"]["lat"] = currentGPS.lat;
@@ -641,9 +645,10 @@ bool fetchOpenWeatherMap() {
             apiWeather.pressureMSL = docWeather["main"]["pressure"].as<float>();
             int owmId = docWeather["weather"][0]["id"].as<int>();
             apiWeather.weatherCode = mapOWMtoWMO(owmId);
+            apiWeather.weatherDesc = docWeather["weather"][0]["description"].as<String>();
 
-            Serial.printf("Current: Temp=%.1f°C, Press=%.1fhPa, Code=%d (OWM:%d)\n",
-                         apiWeather.temp, apiWeather.pressureMSL, apiWeather.weatherCode, owmId);
+            Serial.printf("Current: Temp=%.1f°C, Press=%.1fhPa, Code=%d (OWM:%d), Desc=%s\n",
+                         apiWeather.temp, apiWeather.pressureMSL, apiWeather.weatherCode, owmId, apiWeather.weatherDesc.c_str());
         } else {
             Serial.print("Weather JSON parse error: ");
             Serial.println(error.c_str());
@@ -705,9 +710,13 @@ bool fetchOpenWeatherMap() {
                 if (temp < dayMin[dayIndex]) dayMin[dayIndex] = temp;
                 if (temp > dayMax[dayIndex]) dayMax[dayIndex] = temp;
 
-                // Prendre le code météo du milieu de la journée (index 4 = ~12h)
+                // Prendre le code météo et la description du milieu de la journée (index 4 = ~12h)
                 if ((i % 8) == 4) {
                     dayCode[dayIndex] = mapOWMtoWMO(code);
+                    // Stocker temporairement la description pour ce jour
+                    if (dayIndex >= 1 && dayIndex <= 3) {
+                        apiWeather.forecastDesc[dayIndex-1] = item["weather"][0]["description"].as<String>();
+                    }
                 }
 
                 Serial.printf("Item %d: Day=%d, Temp=%.1f, Code=%d\n", i, dayIndex, temp, code);

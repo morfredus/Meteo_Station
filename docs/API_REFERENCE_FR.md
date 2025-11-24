@@ -1,4 +1,4 @@
-# Dernière version : **v2.8.5** — Intervalle météo optimisé (15 min), support langue française et endpoint scan I2C.
+# Dernière version : **v2.8.6** — Descriptions météo en français depuis OpenWeatherMap.
 
 # Référence API
 
