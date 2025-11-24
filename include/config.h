@@ -5,6 +5,10 @@
 
 #define PROJECT_NAME "Meteo Station ESP32-S3"
 
+// ================= LANGUE METEO / ALERTES =================
+// Choix: "fr" ou "en" (utilisé pour requêtes OpenWeatherMap: descriptions + alertes)
+#define WEATHER_LANG "fr"
+
 // ================= PINS I2C =================
 #define PIN_I2C_SDA         21 
 #define PIN_I2C_SCL         20 
@@ -58,7 +62,7 @@
 
 // ================= TIMERS (ms) =================
 #define INTERVAL_SENSORS    5000
-#define INTERVAL_WEATHER    900000 
+#define INTERVAL_WEATHER    900000  // 15 minutes
 #define INTERVAL_TELEGRAM   3000   
 #define INTERVAL_DISPLAY    250    
 

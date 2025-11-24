@@ -43,16 +43,26 @@ struct SensorData {
 
 float pressureHistory = 0.0;
 unsigned long lastPressureTime = 0;
-bool autoBrightnessMode = true; 
+bool autoBrightnessMode = true;
+bool bmpAvailable = false;  // Track si BMP280 est disponible 
+bool ahtAvailable = false;  // Track si AHT20 est disponible
+// Log helper for missing AHT20 to avoid spamming the serial
+unsigned long lastAhtWarn = 0;
+const unsigned long AHT_WARN_INTERVAL = 300000; // 5 minutes
+// Store I2C scan results for the debug endpoint
+uint8_t i2cDevices[32];
+int i2cDeviceCount = 0;
 
 struct WeatherData {
   float temp = 0.0;
   int weatherCode = 0;
+  String weatherDesc = "--";  // Description en français
   float pressureMSL = 1013.25;
   int aqi = 0; 
   float forecastMax[3] = {0,0,0};
   float forecastMin[3] = {0,0,0};
   int forecastCode[3] = {0,0,0};
+  String forecastDesc[3] = {"--", "--", "--"};  // Descriptions en français
   String provider = "Recherche..."; 
 } apiWeather;
 
@@ -146,12 +156,29 @@ void setup() {
   // Config LDR (GPIO 4 pour ESP32-S3 recommandé)
   pinMode(PIN_LIGHT_SENSOR, INPUT);
   Serial.printf("LDR configure sur PIN: %d\n", PIN_LIGHT_SENSOR);
+  Serial.printf("LDR configure sur PIN: %d\n", PIN_LIGHT_SENSOR);
 
   pixels.begin();
   pixels.setBrightness(NEOPIXEL_BRIGHTNESS);
   pixels.show();
 
   Wire.begin(PIN_I2C_SDA, PIN_I2C_SCL);
+  // I2C bus scan: lister les adresses détectées pour debugging matériel
+  Serial.println("Scanning I2C bus for devices...");
+  i2cDeviceCount = 0;
+  for (uint8_t addr = 1; addr < 127; ++addr) {
+    Wire.beginTransmission(addr);
+    uint8_t err = Wire.endTransmission();
+    if (err == 0) {
+      Serial.printf(" - Found I2C device at 0x%02X\n", addr);
+      if (i2cDeviceCount < (int)(sizeof(i2cDevices))) {
+        i2cDevices[i2cDeviceCount++] = addr;
+      }
+    }
+  }
+  Serial.println("I2C scan complete.");
+  // Reset last warn to force an immediate message if AHT missing
+  lastAhtWarn = 0 - AHT_WARN_INTERVAL;
   
   tft.init(TFT_WIDTH, TFT_HEIGHT);
   tft.setRotation(TFT_ROTATION);
@@ -185,6 +212,7 @@ void setup() {
     doc["sensor"]["trend"] = localSensor.trend;
     doc["weather"]["temp"] = apiWeather.temp;
     doc["weather"]["code"] = apiWeather.weatherCode;
+    doc["weather"]["desc"] = apiWeather.weatherDesc;
     doc["weather"]["aqi"] = apiWeather.aqi;
     doc["weather"]["provider"] = apiWeather.provider;
     
@@ -193,6 +221,7 @@ void setup() {
         JsonObject day = f.add<JsonObject>();
         day["min"] = apiWeather.forecastMin[i];
         day["max"] = apiWeather.forecastMax[i];
+        day["desc"] = apiWeather.forecastDesc[i];
     }
     
     doc["gps"]["lat"] = currentGPS.lat;
@@ -201,17 +230,75 @@ void setup() {
     doc["gps"]["sats"] = currentGPS.sats;
     doc["sys"]["uptime"] = getUptime();
     doc["sys"]["backlight"] = autoBrightnessMode ? "Auto" : "Max";
-    doc["alert"] = alertActive;
+    doc["alert"]["active"] = alertActive;
+    doc["alert"]["message"] = alertMessage;
     
+    String response; serializeJson(doc, response);
+    request->send(200, "application/json", response);
+  });
+
+  // Debug endpoint: retourne l'état des capteurs et la liste d'adresses I2C détectées
+  server.on("/api/debug", HTTP_GET, [](AsyncWebServerRequest *request){
+    DynamicJsonDocument doc(1024);
+    doc["version"] = PROJECT_VERSION;
+    doc["ahtAvailable"] = ahtAvailable;
+    doc["bmpAvailable"] = bmpAvailable;
+    doc["i2c_count"] = i2cDeviceCount;
+    JsonArray arr = doc.createNestedArray("i2c_devices");
+    for (int i = 0; i < i2cDeviceCount; i++) arr.add(i2cDevices[i]);
+    JsonObject pins = doc.createNestedObject("pins");
+    pins["sda"] = PIN_I2C_SDA;
+    pins["scl"] = PIN_I2C_SCL;
+
+    String response; serializeJson(doc, response);
+    request->send(200, "application/json", response);
+  });
+
+  // Scan endpoint: déclenche un nouveau scan I2C et retourne les résultats
+  server.on("/api/scan", HTTP_POST, [](AsyncWebServerRequest *request){
+    Serial.println("Manual I2C scan requested via /api/scan");
+    i2cDeviceCount = 0;
+    for (uint8_t addr = 1; addr < 127; ++addr) {
+      Wire.beginTransmission(addr);
+      uint8_t err = Wire.endTransmission();
+      if (err == 0) {
+        if (i2cDeviceCount < (int)(sizeof(i2cDevices))) {
+          i2cDevices[i2cDeviceCount++] = addr;
+        }
+      }
+    }
+
+    DynamicJsonDocument doc(512);
+    doc["status"] = "scan_complete";
+    doc["i2c_count"] = i2cDeviceCount;
+    JsonArray arr = doc.createNestedArray("i2c_devices");
+    for (int i = 0; i < i2cDeviceCount; i++) arr.add(i2cDevices[i]);
+
     String response; serializeJson(doc, response);
     request->send(200, "application/json", response);
   });
   
   server.begin();
 
+  Serial.println("\n=== Initial GPS Coordinates ===");
+  Serial.printf("GPS Valid: %s\n", currentGPS.isValid ? "Yes" : "No (using defaults)");
+  Serial.printf("Lat: %.4f, Lon: %.4f\n", currentGPS.lat, currentGPS.lon);
+  Serial.println("===============================\n");
+
+  Serial.println("\n=== Initial Weather Fetch ===");
+  Serial.printf("WiFi Status: %s\n", WiFi.status() == WL_CONNECTED ? "Connected" : "Not Connected");
+  if (WiFi.status() == WL_CONNECTED) {
+    Serial.printf("WiFi SSID: %s\n", WiFi.SSID().c_str());
+    Serial.printf("WiFi IP: %s\n", WiFi.localIP().toString().c_str());
+  }
+  Serial.println("Calling fetchWeather()...");
   fetchWeather();
+  Serial.println("fetchWeather() completed\n");
+
+  Serial.println("Calling updateSensors()...");
   updateSensors();
-  
+  Serial.println("updateSensors() completed\n");
+
   tft.fillScreen(C_BLACK);
   drawFullPage();
 }
@@ -482,62 +569,247 @@ String getUptime() {
 }
 
 void fetchWeather() {
-    if (wifiMulti.run() != WL_CONNECTED) return;
-    tft.fillRect(210, 5, 20, 20, C_BLUE); 
+    if (wifiMulti.run() != WL_CONNECTED) {
+        Serial.println("WiFi not connected, skipping weather update");
+        return;
+    }
+
+    tft.fillRect(210, 5, 20, 20, C_BLUE);
     tft.setCursor(215, 5); tft.setTextColor(C_YELLOW); tft.setTextSize(1); tft.print("DL");
 
-    Serial.println("--- Fetching Weather ---");
+    Serial.println("\n==============================");
+    Serial.println("=== Fetching Weather Data ===");
+    Serial.println("==============================");
+
+    // PRIORITE 1: OpenWeatherMap (pour les alertes et données complètes)
     bool successOWM = fetchOpenWeatherMap();
-    if (successOWM) apiWeather.provider = "OpenWeatherMap";
-    else {
-        Serial.println("OWM Failed, Trying OpenMeteo...");
-        if (fetchOpenMeteo()) apiWeather.provider = "Open-Meteo";
-        else apiWeather.provider = "Erreur Reseau";
+    if (successOWM) {
+        apiWeather.provider = "OpenWeatherMap";
+        Serial.println("✓ OpenWeatherMap: SUCCESS");
+    } else {
+        Serial.println("✗ OpenWeatherMap: FAILED");
+        Serial.println("Trying fallback: Open-Meteo...");
+        if (fetchOpenMeteo()) {
+            apiWeather.provider = "Open-Meteo";
+            Serial.println("✓ Open-Meteo: SUCCESS (fallback)");
+        } else {
+            apiWeather.provider = "Erreur Reseau";
+            Serial.println("✗ Open-Meteo: FAILED");
+        }
     }
-    
-    // APPEL DE LA NOUVELLE FONCTION AQI (OPEN METEO)
+
+    // APPEL DE LA FONCTION AQI (OPEN METEO)
     Serial.println("--- Fetching AQI (Open-Meteo) ---");
-    fetchAQI_OpenMeteo(); 
-    
+    fetchAQI_OpenMeteo();
+
+    Serial.printf("Final provider: %s\n", apiWeather.provider.c_str());
+    Serial.println("==============================\n");
+
     tft.fillRect(210, 5, 20, 20, C_BLUE);
 }
 
 bool fetchOpenWeatherMap() {
     HTTPClient http; http.setTimeout(4000);
-    String url = String("https://api.openweathermap.org/data/2.5/onecall?lat=") + 
-                 String(currentGPS.lat, 4) + "&lon=" + String(currentGPS.lon, 4) + 
-                 "&exclude=minutely,hourly&units=metric&appid=" + OPENWEATHER_API_KEY;
-    http.begin(url);
-    int code = http.GET();
-    if (code == 200) {
-        JsonDocument doc;
-        if (!deserializeJson(doc, http.getString())) {
-            apiWeather.temp = doc["current"]["temp"];
-            apiWeather.pressureMSL = doc["current"]["pressure"];
-            apiWeather.weatherCode = mapOWMtoWMO(doc["current"]["weather"][0]["id"]);
-            for(int i=0; i<3; i++) {
-                apiWeather.forecastMin[i] = doc["daily"][i+1]["temp"]["min"];
-                apiWeather.forecastMax[i] = doc["daily"][i+1]["temp"]["max"];
-                apiWeather.forecastCode[i] = mapOWMtoWMO(doc["daily"][i+1]["weather"][0]["id"]);
-            }
-            if (doc["alerts"].is<JsonArray>()) {
-              alertActive = true;
-              alertMessage = doc["alerts"][0]["event"].as<String>();
-              // Force l'affichage immédiat de la page d'alerte
-              lastAlertActive = false; // permettre la transition
-              currentPage = 5;
-              beep(5, 100);
-              drawFullPage();
-              refreshDisplayData();
-            } else {
-              // Pas d'alerte météo renvoyée -> on réinitialise proprement
-              alertActive = false;
-              alertMessage = "Aucune alerte";
-            }
-            http.end(); return true;
+
+    // Utiliser coordonnées GPS ou coordonnées par défaut
+    float latToUse = currentGPS.isValid ? currentGPS.lat : 44.8378;
+    float lonToUse = currentGPS.isValid ? currentGPS.lon : -0.5792;
+
+    Serial.println("=== OpenWeatherMap Request ===");
+    Serial.printf("Coordinates: %.4f, %.4f (GPS: %s)\n", latToUse, lonToUse, currentGPS.isValid ? "Valid" : "Default");
+
+    // ========================================
+    // PARTIE 1: Météo actuelle (weather API)
+    // ========================================
+    String urlWeather = String("http://api.openweathermap.org/data/2.5/weather?lat=") +
+                        String(latToUse, 4) + "&lon=" + String(lonToUse, 4) +
+                        "&units=metric&lang=" + String(WEATHER_LANG) + "&appid=" + OPENWEATHER_API_KEY;
+
+    Serial.println("Weather URL: " + urlWeather);
+    http.begin(urlWeather);
+    int codeWeather = http.GET();
+    Serial.printf("Weather HTTP Code: %d\n", codeWeather);
+
+    if (codeWeather == 200) {
+        String payload = http.getString();
+        Serial.printf("Weather Payload: %d bytes\n", payload.length());
+
+        JsonDocument docWeather;
+        DeserializationError error = deserializeJson(docWeather, payload);
+
+        if (!error) {
+            Serial.println("Weather JSON parsed OK!");
+
+            // Extraire les données actuelles
+            apiWeather.temp = docWeather["main"]["temp"].as<float>();
+            apiWeather.pressureMSL = docWeather["main"]["pressure"].as<float>();
+            int owmId = docWeather["weather"][0]["id"].as<int>();
+            apiWeather.weatherCode = mapOWMtoWMO(owmId);
+            apiWeather.weatherDesc = docWeather["weather"][0]["description"].as<String>();
+
+            Serial.printf("Current: Temp=%.1f°C, Press=%.1fhPa, Code=%d (OWM:%d), Desc=%s\n",
+                         apiWeather.temp, apiWeather.pressureMSL, apiWeather.weatherCode, owmId, apiWeather.weatherDesc.c_str());
+        } else {
+            Serial.print("Weather JSON parse error: ");
+            Serial.println(error.c_str());
+            http.end();
+            return false;
         }
+    } else {
+        Serial.printf("Weather request failed: %d\n", codeWeather);
+        http.end();
+        return false;
     }
-    http.end(); return false;
+    http.end();
+
+    // ========================================
+    // PARTIE 2: Prévisions (forecast API)
+    // ========================================
+    String urlForecast = String("http://api.openweathermap.org/data/2.5/forecast?lat=") +
+                         String(latToUse, 4) + "&lon=" + String(lonToUse, 4) +
+                         "&units=metric&lang=" + String(WEATHER_LANG) + "&appid=" + OPENWEATHER_API_KEY;
+
+    Serial.println("Forecast URL: " + urlForecast);
+    http.begin(urlForecast);
+    int codeForecast = http.GET();
+    Serial.printf("Forecast HTTP Code: %d\n", codeForecast);
+
+    if (codeForecast == 200) {
+        String payload = http.getString();
+        Serial.printf("Forecast Payload: %d bytes\n", payload.length());
+
+        JsonDocument docForecast;
+        DeserializationError error = deserializeJson(docForecast, payload);
+
+        if (!error) {
+            Serial.println("Forecast JSON parsed OK!");
+
+            // L'API forecast retourne des prévisions toutes les 3h
+            // On va extraire les min/max par jour
+            JsonArray list = docForecast["list"].as<JsonArray>();
+            Serial.printf("Forecast items: %d\n", list.size());
+
+            // Organiser les données par jour (8 prévisions = 1 jour)
+            // Index 0-7: Aujourd'hui, 8-15: Demain, 16-23: J+2, 24-31: J+3
+            float dayMin[4] = {999, 999, 999, 999};
+            float dayMax[4] = {-999, -999, -999, -999};
+            int dayCode[4] = {0, 0, 0, 0};
+
+            // Parcourir toutes les prévisions 3h
+            for (int i = 0; i < list.size() && i < 32; i++) {
+                JsonObject item = list[i].as<JsonObject>();
+
+                // Calculer le jour (8 prévisions = 1 jour)
+                int dayIndex = i / 8;
+                if (dayIndex > 3) break;
+
+                float temp = item["main"]["temp"].as<float>();
+                int code = item["weather"][0]["id"].as<int>();
+
+                // Mise à jour min/max
+                if (temp < dayMin[dayIndex]) dayMin[dayIndex] = temp;
+                if (temp > dayMax[dayIndex]) dayMax[dayIndex] = temp;
+
+                // Prendre le code météo et la description du milieu de la journée (index 4 = ~12h)
+                if ((i % 8) == 4) {
+                    dayCode[dayIndex] = mapOWMtoWMO(code);
+                    // Stocker temporairement la description pour ce jour
+                    if (dayIndex >= 1 && dayIndex <= 3) {
+                        apiWeather.forecastDesc[dayIndex-1] = item["weather"][0]["description"].as<String>();
+                    }
+                }
+
+                Serial.printf("Item %d: Day=%d, Temp=%.1f, Code=%d\n", i, dayIndex, temp, code);
+            }
+
+            // Stocker les prévisions pour J+1, J+2, J+3
+            for (int i = 0; i < 3; i++) {
+                apiWeather.forecastMin[i] = dayMin[i+1];
+                apiWeather.forecastMax[i] = dayMax[i+1];
+                apiWeather.forecastCode[i] = dayCode[i+1];
+
+                Serial.printf("FINAL Day %d: Min=%.1f, Max=%.1f, Code=%d\n",
+                             i+1, apiWeather.forecastMin[i], apiWeather.forecastMax[i], apiWeather.forecastCode[i]);
+            }
+
+        } else {
+            Serial.print("Forecast JSON parse error: ");
+            Serial.println(error.c_str());
+            http.end();
+            return false;
+        }
+    } else {
+        Serial.printf("Forecast request failed: %d\n", codeForecast);
+        http.end();
+        return false;
+    }
+    http.end();
+
+    // ========================================
+    // PARTIE 3: Alertes (One Call API 3.0)
+    // ========================================
+    Serial.println("\n--- Checking for Weather Alerts ---");
+    String urlAlerts = String("https://api.openweathermap.org/data/3.0/onecall?lat=") +
+                       String(latToUse, 4) + "&lon=" + String(lonToUse, 4) +
+                       "&exclude=minutely,hourly,daily&units=metric&lang=" + String(WEATHER_LANG) + "&appid=" + OPENWEATHER_API_KEY;
+
+    Serial.println("Alerts URL: " + urlAlerts);
+    http.begin(urlAlerts);
+    int codeAlerts = http.GET();
+    Serial.printf("Alerts HTTP Code: %d\n", codeAlerts);
+
+    if (codeAlerts == 200) {
+        String payload = http.getString();
+        Serial.printf("Alerts Payload: %d bytes\n", payload.length());
+
+        JsonDocument docAlerts;
+        DeserializationError error = deserializeJson(docAlerts, payload);
+
+        if (!error) {
+            Serial.println("Alerts JSON parsed OK!");
+
+            // Vérifier la présence d'alertes
+            if (docAlerts.containsKey("alerts") && docAlerts["alerts"].is<JsonArray>()) {
+                JsonArray alerts = docAlerts["alerts"].as<JsonArray>();
+                Serial.printf("Found %d alert(s)!\n", alerts.size());
+
+                if (alerts.size() > 0) {
+                    alertActive = true;
+                    alertMessage = docAlerts["alerts"][0]["event"].as<String>();
+                    Serial.println("Alert: " + alertMessage);
+
+                    // Force l'affichage immédiat de la page d'alerte
+                    lastAlertActive = false;
+                    currentPage = 3;
+                    beep(5, 100);
+                    drawFullPage();
+                    refreshDisplayData();
+                } else {
+                    alertActive = false;
+                    alertMessage = "Aucune alerte";
+                }
+            } else {
+                Serial.println("No alerts in response");
+                alertActive = false;
+                alertMessage = "Aucune alerte";
+            }
+        } else {
+            Serial.print("Alerts JSON parse error: ");
+            Serial.println(error.c_str());
+        }
+    } else if (codeAlerts == 401) {
+        Serial.println("⚠ One Call API 3.0 requires subscription (alerts disabled)");
+        alertActive = false;
+        alertMessage = "Aucune alerte";
+    } else {
+        Serial.printf("Alerts request failed: %d\n", codeAlerts);
+        alertActive = false;
+        alertMessage = "Aucune alerte";
+    }
+    http.end();
+
+    Serial.println("✓ OpenWeatherMap fetch complete!");
+    return true;
 }
 
 bool fetchOpenMeteo() {
@@ -659,17 +931,56 @@ void drawStartupScreen() {
 }
 
 void initSensors() {
-    if(!aht.begin()) Serial.println("AHT20 ERROR");
-    if (!bmp.begin(0x76) && !bmp.begin(0x77)) localSensor.pres = NAN;
-    else bmp.setSampling(Adafruit_BMP280::MODE_NORMAL, Adafruit_BMP280::SAMPLING_X2, Adafruit_BMP280::SAMPLING_X16, Adafruit_BMP280::FILTER_X16, Adafruit_BMP280::STANDBY_MS_500);
+  // Initialisation AHT20
+  ahtAvailable = aht.begin();
+  if(!ahtAvailable) {
+    Serial.println("AHT20 ERROR - Temperature/Humidity disabled");
+    localSensor.temp = NAN;
+    localSensor.hum = NAN;
+  } else {
+    Serial.println("AHT20 OK");
+  }
+
+    // Essayer d'initialiser BMP280 aux deux adresses possibles
+    bmpAvailable = bmp.begin(0x76) || bmp.begin(0x77);
+
+    if (!bmpAvailable) {
+        Serial.println("BMP280 NOT FOUND - Pressure readings disabled");
+        localSensor.pres = NAN;
+    } else {
+        Serial.println("BMP280 OK");
+        bmp.setSampling(Adafruit_BMP280::MODE_NORMAL, Adafruit_BMP280::SAMPLING_X2,
+                       Adafruit_BMP280::SAMPLING_X16, Adafruit_BMP280::FILTER_X16,
+                       Adafruit_BMP280::STANDBY_MS_500);
+    }
 }
 
 void updateSensors() {
-  sensors_event_t h, t; aht.getEvent(&h, &t);
-  localSensor.temp = t.temperature; localSensor.hum = h.relative_humidity;
-  float p = bmp.readPressure();
-  if (!isnan(p) && p > 0) localSensor.pres = p / 100.0F;
-  updatePressureTrend(localSensor.pres);
+  // Lire AHT20 seulement si disponible
+  if (ahtAvailable) {
+    sensors_event_t h, t; aht.getEvent(&h, &t);
+    localSensor.temp = t.temperature; localSensor.hum = h.relative_humidity;
+  } else {
+    // Marquer comme non disponible
+    localSensor.temp = NAN; localSensor.hum = NAN;
+    // Log périodique pour aider le debugging matériel (toutes les 5 minutes)
+    unsigned long now = millis();
+    if (now - lastAhtWarn > AHT_WARN_INTERVAL) {
+      Serial.println("AHT20 still not available — skipping temperature/humidity readings.");
+      lastAhtWarn = now;
+    }
+  }
+
+  // Lire la pression seulement si BMP280 est disponible
+  if (bmpAvailable) {
+    float p = bmp.readPressure();
+    if (!isnan(p) && p > 0) {
+      localSensor.pres = p / 100.0F;
+      updatePressureTrend(localSensor.pres);
+    }
+  } else {
+    localSensor.pres = NAN;
+  }
   
   // LDR DEBUG
   int rawLux = analogRead(PIN_LIGHT_SENSOR);
@@ -783,16 +1094,16 @@ void refreshDisplayData() {
         tft.setTextColor(aqiColor, C_BLACK); tft.printf("AQI: %d", apiWeather.aqi);
     }
   }
-  else if (currentPage == 2) {
-      const char* labels[3] = {"Demain", "J + 2", "J + 3"};
-      for(int i=0; i<3; i++) {
-          int y = 80 + (i*50); 
-          tft.setTextSize(2); tft.setTextColor(C_WHITE, C_BLACK);
-          tft.setCursor(10, y); tft.print(cleanText(labels[i]));
-          tft.fillRect(100, y-10, 40, 30, C_BLACK);
-          drawWeatherByCode(tft, 120, y+5, apiWeather.forecastCode[i]);
-          tft.setTextColor(C_BLUE, C_BLACK); tft.setCursor(160, y); tft.printf("%.0f", apiWeather.forecastMin[i]);
-          tft.setTextColor(C_RED, C_BLACK); tft.setCursor(200, y); tft.printf("%.0f", apiWeather.forecastMax[i]);
+  else if (currentPage == 3) { // ALERTES METEO
+      tft.fillRect(10, 75, 220, 145, C_BLACK);
+      if(alertActive) {
+          tft.setCursor(10, 80); tft.setTextColor(C_RED); tft.setTextSize(2); tft.print("ALERTE !");
+          tft.setCursor(10, 105); tft.setTextSize(1); tft.setTextColor(C_WHITE); tft.print(cleanText(alertMessage));
+          tft.fillCircle(200, 165, 30, C_RED); tft.setTextColor(C_WHITE); tft.setCursor(192, 156); tft.setTextSize(3); tft.print("!");
+      } else {
+          tft.setCursor(10, 100); tft.setTextColor(C_GREEN); tft.setTextSize(2); tft.print("AUCUNE");
+          tft.setCursor(10, 125); tft.setTextSize(1); tft.setTextColor(C_GREY); tft.print("Aucune alerte active");
+          tft.fillCircle(200, 165, 30, C_GREEN); tft.setTextColor(C_BLACK); tft.setCursor(186, 156); tft.setTextSize(2); tft.print("OK");
       }
   }
   else if (currentPage == 3) { // GPS

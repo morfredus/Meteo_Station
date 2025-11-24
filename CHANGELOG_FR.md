@@ -1,5 +1,126 @@
 # Historique des Versions (Changelog)
 
+## [2.8.7] - 2025-11-24
+### Correctif : Langue météo configurable
+- **Configuration :** Ajout de la directive `WEATHER_LANG` dans `config.h`
+  - Permet de choisir entre "fr" (français) ou "en" (anglais)
+  - Configuration centralisée de la langue des données météo
+- **Intégration API :** Mise à jour de tous les appels API OpenWeatherMap pour utiliser `WEATHER_LANG`
+  - API météo actuelle (`/data/2.5/weather`)
+  - API prévisions (`/data/2.5/forecast`)
+  - API alertes (`/data/3.0/onecall`)
+- **Flexibilité :** Point de configuration unique pour la préférence de langue météo
+  - Changement de langue en modifiant une seule ligne dans `config.h`
+  - Affecte les descriptions météo, prévisions et alertes
+
+## [2.8.6] - 2025-11-24
+### Correctif : Descriptions météo en français
+- **Descriptions météo :** Ajout des descriptions météo en français depuis OpenWeatherMap
+  - Ajout du champ `weatherDesc` pour la météo actuelle
+  - Ajout du champ `forecastDesc[3]` pour les prévisions sur 3 jours
+  - Récupération depuis `weather[0].description` avec paramètre `lang=fr`
+- **Affichage :** Les descriptions météo s'affichent en français
+  - Interface web : affichage de la description au lieu du code WMO
+  - API JSON : ajout des champs `weather.desc` et `forecast[].desc`
+- **Expérience utilisateur :** Amélioration avec informations localisées lisibles
+
+## [2.8.5] - 2025-11-24
+### Correctif : Intervalle météo, langue et endpoint scan I2C
+- **Intervalle météo :** Retour à l'intervalle de 15 minutes (900000 ms) pour INTERVAL_WEATHER
+  - L'intervalle de 2 minutes était trop fréquent, retour à la valeur optimale précédente
+- **Langue française :** Ajout du paramètre `lang=fr` aux API OpenWeatherMap
+  - Ajouté à l'API météo actuelle (`/data/2.5/weather`)
+  - Ajouté à l'API prévisions (`/data/2.5/forecast`)
+  - Garantit la réception des données en français (déjà présent sur One Call API)
+- **Endpoint I2C :** Implémentation de l'endpoint `/api/scan` (POST)
+  - Permet de déclencher manuellement un scan I2C depuis l'interface web
+  - Retourne la liste des périphériques détectés au format JSON
+  - Améliore les capacités de diagnostic matériel
+
+## [2.8.4] - 2025-11-24
+### Correctif : Interface web et intervalle de mise à jour météo
+- **Page web :** Correction de la page web qui n'affichait rien à cause d'une duplication de code corrompue dans `web_page.h`
+  - Suppression du code dupliqué et reconstruction de la page complète
+  - Amélioration de l'interface avec section diagnostics et tests API
+  - Ajout de boutons pour rafraîchir les diagnostics et afficher les périphériques I2C
+- **Intervalle météo :** Réduction de l'intervalle de mise à jour météo de 15 minutes à 2 minutes
+  - `INTERVAL_WEATHER` passé de 900000 ms (15 min) à 120000 ms (2 min)
+  - Permet une actualisation plus fréquente des données météo
+- **Stabilité :** Amélioration de la réactivité du système avec des mises à jour plus fréquentes
+
+## [2.8.3] - 2025-11-24
+### Correctif : Robustesse initialisation I2C
+- **AHT20 :** Ajout d'un flag `ahtAvailable` et protection des lectures AHT20 si le capteur n'est pas présent ou échoue à l'initialisation.
+  - Évite l'erreur runtime I2C : `requestFrom(): i2cRead returned Error -1`.
+  - Température/humidité marquées `NAN` si capteur absent, le système continue de fonctionner.
+- **Bump version :** Passage en `2.8.3` et mise à jour des docs utilisateur.
+
+## [2.8.2] - 2025-11-24
+### Correctif : Erreur I2C et réactivation des alertes météo
+- **Erreur I2C :** Correction de l'erreur `i2cRead returned Error -1`
+  - Ajout d'un flag `bmpAvailable` pour tracker si le BMP280 est initialisé
+  - Ne tente de lire le BMP280 que s'il est disponible
+  - Affiche un message clair si le BMP280 n'est pas trouvé
+  - Évite les appels I2C inutiles qui causaient l'erreur
+- **Alertes météo :** Réactivation de la récupération des alertes
+  - Utilise One Call API 3.0 (`/data/3.0/onecall`)
+  - Affiche les alertes si disponibles (nécessite abonnement)
+  - Gère proprement les codes d'erreur (401 = pas d'accès)
+  - Logs détaillés pour diagnostic
+- **Stabilité :** Amélioration de la robustesse du système avec gestion des périphériques manquants
+
+## [2.8.1] - 2025-11-24
+### Correctif : Calcul des prévisions et logs de débogage
+- **Prévisions :** Correction du calcul des min/max par jour (valeurs 999/-999 corrigées)
+  - Nouveau calcul basé sur les index : 8 prévisions 3h = 1 jour
+  - Index 0-7: Aujourd'hui, 8-15: Demain, 16-23: J+2, 24-31: J+3
+  - Logs détaillés de chaque prévision pour diagnostic
+- **Débogage :** Ajout de logs au démarrage pour vérifier :
+  - Statut WiFi avant récupération météo
+  - SSID et IP si connecté
+  - Confirmation d'appel et de complétion de fetchWeather()
+  - Confirmation d'appel et de complétion de updateSensors()
+- **Stabilité :** Résolution du problème d'affichage de valeurs incorrectes (999)
+
+## [2.8.0] - 2025-11-24
+### Changement Majeur : Migration vers API OpenWeatherMap Gratuite
+- **API OpenWeatherMap :** Migration complète vers les API gratuites :
+  - **Météo actuelle :** Utilisation de l'API `/data/2.5/weather` au lieu de `onecall`
+  - **Prévisions :** Utilisation de l'API `/data/2.5/forecast` (prévisions 3h sur 5 jours)
+  - **Raison :** L'API One Call 2.5 nécessite maintenant un abonnement payant
+- **Décodage JSON :** Adaptation complète du décodage pour les nouvelles structures de réponse :
+  - Extraction de `main.temp`, `main.pressure` pour la météo actuelle
+  - Calcul des min/max par jour à partir des prévisions 3h
+  - Logs de débogage détaillés pour chaque étape
+- **Alertes météo :** Temporairement désactivées (nécessitent One Call API 3.0 avec abonnement)
+- **Stabilité :** Correction du problème de valeurs à zéro grâce au nouveau décodage JSON correct
+
+## [2.7.1] - 2025-11-24
+### Correctif : Alertes Météo et Débogage OpenWeatherMap
+- **Page Alertes :** Modification de l'affichage "NOMINAL" → "AUCUNE" pour plus de clarté quand aucune alerte n'est active.
+- **OpenWeatherMap :** Ajout de logs de débogage complets pour diagnostiquer les problèmes de récupération des alertes :
+  - Affichage des coordonnées GPS utilisées (valides ou par défaut)
+  - Logs détaillés de la requête HTTP et de la réponse JSON
+  - Vérification explicite de la présence d'alertes dans la réponse
+  - Comptage du nombre d'alertes trouvées
+- **Coordonnées :** Utilisation explicite des coordonnées GPS valides ou des coordonnées par défaut de Bordeaux (44.8378, -0.5792).
+- **Priorité API :** Confirmation qu'OpenWeatherMap est toujours utilisé en priorité pour obtenir les alertes météo officielles.
+
+## [2.7.0] - 2025-11-24
+### Amélioration Majeure : Réorganisation des Pages
+- **Navigation :** Réorganisation complète de l'ordre des pages pour une meilleure expérience utilisateur.
+  - **Page 0 :** Résumé (inchangé)
+  - **Page 1 :** Prévisions (anciennement page 2)
+  - **Page 2 :** Environnement (anciennement page 1)
+  - **Page 3 :** **NOUVELLE** - Alertes Météo (page dédiée)
+  - **Page 4 :** Données GPS (anciennement page 3)
+  - **Page 5 :** Réseau & Système (anciennement page 4)
+  - **Page 6 :** État Système (anciennement page 5)
+- **Alertes :** Nouvelle page dédiée aux alertes météorologiques avec affichage visuel amélioré.
+  - Affiche les alertes provenant d'OpenWeatherMap en temps réel.
+  - Interface visuelle optimisée avec icône d'alerte rouge ou statut nominal vert.
+- **UX :** Ordre des pages plus logique : Résumé → Prévisions → Environnement → Alertes → GPS → Réseau → Système.
+
 ## [2.6.4] - 2025-11-23
 -### Correctif : Telegram & UX
 - **Telegram :** Envoi au démarrage d'un message de démarrage court ; le premier rapport complet est envoyé automatiquement lorsque les mesures (capteurs / météo) sont disponibles.

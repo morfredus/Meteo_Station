@@ -14,21 +14,15 @@ const char index_html[] PROGMEM = R"rawliteral(
     .container { max-width: 800px; margin: 0 auto; }
     h1 { text-align: center; color: var(--accent); margin-bottom: 5px; }
     .subtitle { text-align: center; color: #888; font-size: 0.9rem; margin-bottom: 30px; }
-    
     .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; }
     .card { background: var(--card); padding: 20px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.3); text-align: center; }
     .card h3 { margin: 0 0 10px 0; font-size: 1rem; color: #aaa; text-transform: uppercase; letter-spacing: 1px; }
     .value { font-size: 2.5rem; font-weight: 700; margin: 10px 0; }
     .unit { font-size: 1rem; color: #666; font-weight: normal; }
     .sub-value { font-size: 0.9rem; color: #888; margin-top: 5px; }
-    
-    /* Indicateurs spécifiques */
     .aqi-badge { padding: 5px 10px; border-radius: 20px; font-weight: bold; color: #000; display: inline-block; margin-top: 5px;}
-    
     .alert-box { background: rgba(255, 82, 82, 0.1); border: 1px solid var(--danger); color: var(--danger); padding: 15px; border-radius: 8px; margin-bottom: 20px; display: none; text-align: center; animation: pulse 2s infinite; }
-    
     .footer { margin-top: 40px; text-align: center; font-size: 0.8rem; color: #555; border-top: 1px solid #333; padding-top: 20px; }
-    
     @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.7; } 100% { opacity: 1; } }
   </style>
 </head>
@@ -49,13 +43,11 @@ const char index_html[] PROGMEM = R"rawliteral(
       <div class="value"><span id="inTemp">--</span><span class="unit">°C</span></div>
       <div class="sub-value">Hum: <span id="inHum">--</span>%</div>
     </div>
-    
     <div class="card">
       <h3>Atmosphère</h3>
       <div class="value"><span id="inPres">--</span><span class="unit">hPa</span></div>
       <div class="sub-value">Tendance: <span id="trend">--</span></div>
     </div>
-
     <div class="card">
       <h3>Ambiance</h3>
       <div class="value"><span id="inLux">--</span><span class="unit">lux</span></div>
@@ -64,20 +56,17 @@ const char index_html[] PROGMEM = R"rawliteral(
   </div>
 
   <h2 style="margin-top:30px; font-size:1.2rem; border-bottom:1px solid #333; padding-bottom:10px;">Extérieur & Prévisions</h2>
-  
   <div class="grid">
     <div class="card" style="border-top: 3px solid var(--accent);">
       <h3>Extérieur</h3>
       <div class="value"><span id="outTemp">--</span><span class="unit">°C</span></div>
       <div class="sub-value" id="weatherDesc">--</div>
     </div>
-
     <div class="card">
       <h3>Qualité Air</h3>
       <div class="value" id="aqiVal">--</div>
       <div id="aqiText" class="aqi-badge" style="background:#555;">--</div>
     </div>
-
     <div class="card">
       <h3>GPS / Réseau</h3>
       <div style="font-size:0.9rem; text-align:left; line-height:1.6;">
@@ -104,9 +93,52 @@ const char index_html[] PROGMEM = R"rawliteral(
     </div>
   </div>
 
-    <div class="footer">
-    Système v)rawliteral" PROJECT_VERSION R"rawliteral( • ESP32-S3 • <a href="/api/data" target="_blank" style="color:#666">Voir JSON Brut</a>
+  <div class="footer">
+    <div style="margin-bottom:8px;">Système <strong>v</strong>: <span id="version">--</span> • ESP32-S3</div>
+    <div style="font-size:0.85rem; color:#777;">
+      <a href="/api/data" target="_blank" style="color:#aaa">/api/data</a> (JSON capteurs) •
+      <a href="/api/debug" target="_blank" style="color:#aaa">/api/debug</a> (Diagnostics)
+    </div>
   </div>
+
+  <h2 style="margin-top:30px; font-size:1.1rem; border-bottom:1px solid #333; padding-bottom:10px;">Diagnostics & Tests API</h2>
+
+  <div class="grid">
+    <div class="card">
+      <h3>Diagnostics Rapides</h3>
+      <div style="text-align:left; font-size:0.9rem; line-height:1.4;">
+        <strong>Version:</strong> <span id="dbg_version">--</span><br>
+        <strong>AHT20:</strong> <span id="dbg_aht">--</span><br>
+        <strong>BMP280:</strong> <span id="dbg_bmp">--</span><br>
+        <strong>I2C devices:</strong> <span id="dbg_i2c">aucun</span>
+      </div>
+      <div style="margin-top:10px;"><button id="btnDebug" style="padding:8px 12px; border-radius:6px; background:var(--accent); color:#000; border:none; cursor:pointer;">Rafraîchir diagnostics</button></div>
+    </div>
+
+    <div class="card">
+      <h3>Tests & Endpoints</h3>
+      <div style="text-align:left; font-size:0.85rem; color:#bbb;">
+        <div><strong>GET</strong> <a href="/api/data" target="_blank">/api/data</a> — JSON capteurs & météo</div>
+        <div style="margin-top:6px;"><strong>GET</strong> <a href="/api/debug" target="_blank">/api/debug</a> — état capteurs, I2C</div>
+        <div style="margin-top:6px;"><strong>POST</strong> /api/scan — scan I2C manuel (voir bouton ci-contre)</div>
+        <div style="margin-top:8px;">Exemples (terminal):</div>
+        <pre style="background:#111; color:#9f9; padding:8px; border-radius:6px; font-size:0.85rem;">curl http://DEVICE_IP/api/data
+curl http://DEVICE_IP/api/debug
+curl -X POST http://DEVICE_IP/api/scan</pre>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>Tester I2C (local)</h3>
+      <div style="font-size:0.85rem; text-align:left; color:#bbb; line-height:1.4;">
+        Vous pouvez afficher la liste des devices I2C détectés et leurs adresses hex.
+        <div style="margin-top:8px;"><button id="btnShowI2C" style="padding:8px 12px; border-radius:6px; background:#444; color:#fff; border:none; cursor:pointer;">Afficher I2C</button></div>
+        <pre id="i2cList" style="background:#0f0f0f; color:#ddd; padding:8px; border-radius:6px; margin-top:8px;">--</pre>
+      </div>
+    </div>
+  </div>
+
+</div>
 
 <script>
   function getAQIColor(aqi) {
@@ -117,24 +149,24 @@ const char index_html[] PROGMEM = R"rawliteral(
     return ['#5f27cd', 'Dangereux'];
   }
 
+  function safeFixed(v, digits) {
+    if (v === null || v === undefined || isNaN(v)) return '--';
+    return Number(v).toFixed(digits);
+  }
+
   function updateData() {
     fetch('/api/data')
       .then(response => response.json())
       .then(data => {
-        // Sensor
-        document.getElementById('inTemp').innerText = data.sensor.temp.toFixed(1);
-        document.getElementById('inHum').innerText = data.sensor.hum.toFixed(0);
-        document.getElementById('inPres').innerText = data.sensor.pres.toFixed(0);
-        document.getElementById('inLux').innerText = data.sensor.lux;
-        document.getElementById('trend').innerText = data.sensor.trend;
-
-        // Weather
-        document.getElementById('outTemp').innerText = data.weather.temp.toFixed(1);
-        document.getElementById('weatherDesc').innerText = "Code WMO: " + data.weather.code;
-        document.getElementById('provider').innerText = data.weather.provider;
-
-        // AQI
-        const aqi = data.weather.aqi;
+        document.getElementById('inTemp').innerText = safeFixed(data.sensor.temp,1);
+        document.getElementById('inHum').innerText = safeFixed(data.sensor.hum,0);
+        document.getElementById('inPres').innerText = safeFixed(data.sensor.pres,0);
+        document.getElementById('inLux').innerText = data.sensor.lux || '--';
+        document.getElementById('trend').innerText = data.sensor.trend || '--';
+        document.getElementById('outTemp').innerText = safeFixed(data.weather.temp,1);
+        document.getElementById('weatherDesc').innerText = data.weather.desc || 'Code WMO: ' + (data.weather.code || '--');
+        document.getElementById('provider').innerText = data.weather.provider || '--';
+        const aqi = data.weather.aqi || 0;
         document.getElementById('aqiVal').innerText = aqi;
         if(aqi > 0) {
             const info = getAQIColor(aqi);
@@ -142,37 +174,76 @@ const char index_html[] PROGMEM = R"rawliteral(
             el.innerText = info[1];
             el.style.background = info[0];
         }
-
-        // GPS
-        document.getElementById('lat').innerText = data.gps.lat.toFixed(4);
-        document.getElementById('lon').innerText = data.gps.lon.toFixed(4);
-        document.getElementById('sats').innerText = data.gps.sats;
-
-        // Forecast
-        const f = data.forecast; // Assuming array provided in JSON
-        if(f) {
-            document.getElementById('f1max').innerText = f[0].max.toFixed(0); document.getElementById('f1min').innerText = f[0].min.toFixed(0);
-            document.getElementById('f2max').innerText = f[1].max.toFixed(0); document.getElementById('f2min').innerText = f[1].min.toFixed(0);
-            document.getElementById('f3max').innerText = f[2].max.toFixed(0); document.getElementById('f3min').innerText = f[2].min.toFixed(0);
+        document.getElementById('lat').innerText = safeFixed(data.gps.lat,4);
+        document.getElementById('lon').innerText = safeFixed(data.gps.lon,4);
+        document.getElementById('sats').innerText = data.gps.sats || '--';
+        const f = data.forecast;
+        if(f && f.length >= 3) {
+            document.getElementById('f1max').innerText = safeFixed(f[0].max,0); document.getElementById('f1min').innerText = safeFixed(f[0].min,0);
+            document.getElementById('f2max').innerText = safeFixed(f[1].max,0); document.getElementById('f2min').innerText = safeFixed(f[1].min,0);
+            document.getElementById('f3max').innerText = safeFixed(f[2].max,0); document.getElementById('f3min').innerText = safeFixed(f[2].min,0);
         }
-
-        // System
-        document.getElementById('uptime').innerText = data.sys.uptime;
-
-        // Alert
-        const alertBox = document.getElementById('alertPanel');
-        if(data.alert) {
-            alertBox.style.display = 'block';
-            document.getElementById('alertMsg').innerText = "Température critique détectée !";
+        document.getElementById('uptime').innerText = data.sys ? (data.sys.uptime || '--') : '--';
+        
+        // Gestion des alertes
+        const alertPanel = document.getElementById('alertPanel');
+        const alertMsg = document.getElementById('alertMsg');
+        if (data.alert && data.alert.active) {
+          alertPanel.style.display = 'block';
+          alertMsg.innerText = data.alert.message || 'Alerte active';
         } else {
-            alertBox.style.display = 'none';
+          alertPanel.style.display = 'none';
         }
       })
-      .catch(err => console.error(err));
+      .catch(err => console.error('updateData error', err));
   }
 
-  setInterval(updateData, 2000);
-  updateData();
+  function updateDebug() {
+    fetch('/api/debug')
+      .then(r => { if (!r.ok) throw new Error('debug endpoint non disponible'); return r.json(); })
+      .then(d => {
+        document.getElementById('dbg_version').innerText = d.version || '--';
+        document.getElementById('version').innerText = d.version || '--';
+        document.getElementById('dbg_aht').innerText = d.ahtAvailable ? 'OK' : 'ABSENT';
+        document.getElementById('dbg_bmp').innerText = d.bmpAvailable ? 'OK' : 'ABSENT';
+        if (d.i2c_count && Array.isArray(d.i2c_devices)) {
+          const hexes = d.i2c_devices.map(a => '0x' + (Number(a).toString(16).toUpperCase().padStart(2,'0'))).join(', ');
+          document.getElementById('dbg_i2c').innerText = hexes || 'aucun';
+          document.getElementById('i2cList').innerText = hexes || 'aucun';
+        } else {
+          document.getElementById('dbg_i2c').innerText = 'aucun';
+          document.getElementById('i2cList').innerText = 'aucun';
+        }
+      })
+      .catch(err => {
+        document.getElementById('dbg_version').innerText = '--';
+        document.getElementById('dbg_aht').innerText = 'N/A';
+        document.getElementById('dbg_bmp').innerText = 'N/A';
+        document.getElementById('dbg_i2c').innerText = 'N/A';
+        document.getElementById('i2cList').innerText = 'Endpoint /api/debug non disponible';
+        console.warn('updateDebug error', err);
+      });
+  }
+
+  document.addEventListener('DOMContentLoaded', function(){
+    const btnDebug = document.getElementById('btnDebug');
+    if(btnDebug) btnDebug.addEventListener('click', updateDebug);
+    const btnShowI2C = document.getElementById('btnShowI2C');
+    if(btnShowI2C) btnShowI2C.addEventListener('click', updateDebug);
+    const tryScan = document.createElement('button');
+    tryScan.textContent = 'Lancer I2C scan (si supporté)';
+    tryScan.style = 'padding:8px 12px; margin-left:8px; border-radius:6px; background:#222; color:#fff; border:none; cursor:pointer;';
+    tryScan.onclick = function(){
+      fetch('/api/scan', { method: 'POST' })
+        .then(r => r.json())
+        .then(j => { document.getElementById('i2cList').innerText = JSON.stringify(j); updateDebug(); })
+        .catch(e => { document.getElementById('i2cList').innerText = 'Endpoint /api/scan non disponible'; console.warn(e); });
+    };
+    if (btnShowI2C && btnShowI2C.parentNode) btnShowI2C.parentNode.appendChild(tryScan);
+    updateData(); updateDebug();
+    setInterval(updateData, 2000);
+    setInterval(updateDebug, 10000);
+  });
 </script>
 </body>
 </html>

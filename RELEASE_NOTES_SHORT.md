@@ -1,11 +1,14 @@
-# Release v2.6.4 — Short Notes
+# Release v2.8.7 — Short Notes
 
 ## English summary
 
-v2.6.0 — Reliability improvement (AQI provider change)
+v2.8.7 — Patch: Configurable weather language
 
-- Switched the air-quality data provider to **Open‑Meteo Air Quality API** (free, no API key required) to improve AQI reliability.
-- Documentation updated across repository to reflect v2.6.0.
+- Added `WEATHER_LANG` define in `config.h` for language selection ("fr"/"en")
+- Updated all OpenWeatherMap API calls to use configurable language parameter
+- Centralized language configuration for weather data, forecasts, and alerts
+- Single configuration point: change language by editing one line in `config.h`
+- Project version bumped to `2.8.7` and user-facing docs updated.
 
 ## Instructions (short)
 
@@ -33,10 +36,13 @@ platformio run
 
 ## Résumé (Français)
 
-v2.6.0 — Amélioration de la fiabilité (changement du fournisseur AQI)
+v2.8.7 — Correctif : Langue météo configurable
 
-- Changement du fournisseur de qualité de l'air vers **Open‑Meteo Air Quality API** (gratuit, sans clé API) pour améliorer la fiabilité des valeurs AQI.
-- Documentation mise à jour dans le dépôt pour refléter v2.6.0.
+- Ajout de la directive `WEATHER_LANG` dans `config.h` pour choisir la langue ("fr"/"en")
+- Mise à jour de tous les appels API OpenWeatherMap pour utiliser le paramètre de langue configurable
+- Configuration centralisée de la langue pour les données météo, prévisions et alertes
+- Point de configuration unique : changement de langue en modifiant une seule ligne dans `config.h`
+- Numéro de version du projet mis à jour en `2.8.7` et documentation utilisateur synchronisée.
 
 ## Instructions (court)
 

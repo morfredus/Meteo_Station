@@ -1,6 +1,6 @@
 # Project Architecture
 
-Latest release: **v2.6.4** — AQI provider switched to Open‑Meteo Air Quality API (free, no API key). The project continues using the stable network forks.
+Latest release: **v2.8.7** — Configurable weather language. The project uses OpenWeatherMap as primary source with Open-Meteo fallback.
 
 This document provides an overview of the software architecture of the Meteo Station.
 
