@@ -1,6 +1,6 @@
 # Architecture du Projet
 
-Dernière version : **v2.8.6** — Descriptions météo en français depuis OpenWeatherMap. Le projet utilise OpenWeatherMap comme source principale avec fallback sur Open-Meteo.
+Dernière version : **v2.8.7** — Langue météo configurable. Le projet utilise OpenWeatherMap comme source principale avec fallback sur Open-Meteo.
 
 Ce document donne un aperçu de l'architecture logicielle de la station météo.
 

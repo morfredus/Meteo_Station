@@ -2,6 +2,19 @@
 
 All notable changes to this project are documented in this file.
 
+## [2.8.7] - 2025-11-24
+### Patch: Configurable weather language
+- **Configuration:** Added `WEATHER_LANG` define in `config.h`
+  - Allows selection between "fr" (French) or "en" (English)
+  - Centralized language configuration for weather data
+- **API integration:** Updated all OpenWeatherMap API calls to use `WEATHER_LANG`
+  - Current weather API (`/data/2.5/weather`)
+  - Forecast API (`/data/2.5/forecast`)
+  - Alerts API (`/data/3.0/onecall`)
+- **Flexibility:** Single configuration point for weather language preference
+  - Change language by editing one line in `config.h`
+  - Affects weather descriptions, forecasts, and alerts
+
 ## [2.8.6] - 2025-11-24
 ### Patch: French weather descriptions
 - **Weather descriptions:** Added French weather descriptions from OpenWeatherMap

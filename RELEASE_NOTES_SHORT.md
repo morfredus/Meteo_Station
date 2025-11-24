@@ -1,14 +1,14 @@
-# Release v2.8.6 — Short Notes
+# Release v2.8.7 — Short Notes
 
 ## English summary
 
-v2.8.6 — Patch: French weather descriptions
+v2.8.7 — Patch: Configurable weather language
 
-- Added French weather descriptions from OpenWeatherMap API
-- Display weather descriptions in French on screen and web interface
-- Added `weatherDesc` and `forecastDesc` fields to API JSON response
-- Improved user experience with localized weather information
-- Project version bumped to `2.8.6` and user-facing docs updated.
+- Added `WEATHER_LANG` define in `config.h` for language selection ("fr"/"en")
+- Updated all OpenWeatherMap API calls to use configurable language parameter
+- Centralized language configuration for weather data, forecasts, and alerts
+- Single configuration point: change language by editing one line in `config.h`
+- Project version bumped to `2.8.7` and user-facing docs updated.
 
 ## Instructions (short)
 
@@ -36,13 +36,13 @@ platformio run
 
 ## Résumé (Français)
 
-v2.8.6 — Correctif : Descriptions météo en français
+v2.8.7 — Correctif : Langue météo configurable
 
-- Ajout des descriptions météo en français depuis l'API OpenWeatherMap
-- Affichage des descriptions météo en français sur l'écran et l'interface web
-- Ajout des champs `weatherDesc` et `forecastDesc` à la réponse JSON de l'API
-- Amélioration de l'expérience utilisateur avec informations météo localisées
-- Numéro de version du projet mis à jour en `2.8.6` et documentation utilisateur synchronisée.
+- Ajout de la directive `WEATHER_LANG` dans `config.h` pour choisir la langue ("fr"/"en")
+- Mise à jour de tous les appels API OpenWeatherMap pour utiliser le paramètre de langue configurable
+- Configuration centralisée de la langue pour les données météo, prévisions et alertes
+- Point de configuration unique : changement de langue en modifiant une seule ligne dans `config.h`
+- Numéro de version du projet mis à jour en `2.8.7` et documentation utilisateur synchronisée.
 
 ## Instructions (court)
 

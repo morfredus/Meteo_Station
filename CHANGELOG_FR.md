@@ -1,5 +1,18 @@
 # Historique des Versions (Changelog)
 
+## [2.8.7] - 2025-11-24
+### Correctif : Langue météo configurable
+- **Configuration :** Ajout de la directive `WEATHER_LANG` dans `config.h`
+  - Permet de choisir entre "fr" (français) ou "en" (anglais)
+  - Configuration centralisée de la langue des données météo
+- **Intégration API :** Mise à jour de tous les appels API OpenWeatherMap pour utiliser `WEATHER_LANG`
+  - API météo actuelle (`/data/2.5/weather`)
+  - API prévisions (`/data/2.5/forecast`)
+  - API alertes (`/data/3.0/onecall`)
+- **Flexibilité :** Point de configuration unique pour la préférence de langue météo
+  - Changement de langue en modifiant une seule ligne dans `config.h`
+  - Affecte les descriptions météo, prévisions et alertes
+
 ## [2.8.6] - 2025-11-24
 ### Correctif : Descriptions météo en français
 - **Descriptions météo :** Ajout des descriptions météo en français depuis OpenWeatherMap

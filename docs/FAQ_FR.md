@@ -1,4 +1,4 @@
-# Dernière version : **v2.8.6** — Descriptions météo en français depuis OpenWeatherMap.
+# Dernière version : **v2.8.7** — Langue météo configurable.
 
 # Foire Aux Questions (FAQ)
 

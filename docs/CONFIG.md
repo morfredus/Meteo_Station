@@ -1,4 +1,4 @@
-# Latest release: **v2.8.6** — French weather descriptions from OpenWeatherMap.
+# Latest release: **v2.8.7** — Configurable weather language.
 
 # Configuration
 
