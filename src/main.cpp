@@ -717,7 +717,7 @@ bool fetchOpenWeatherMap() {
     Serial.println("\n--- Checking for Weather Alerts ---");
     String urlAlerts = String("https://api.openweathermap.org/data/3.0/onecall?lat=") +
                        String(latToUse, 4) + "&lon=" + String(lonToUse, 4) +
-                       "&exclude=minutely,hourly,daily&units=metric&appid=" + OPENWEATHER_API_KEY;
+                       "&exclude=minutely,hourly,daily&units=metric&lang=fr&appid=" + OPENWEATHER_API_KEY;
 
     Serial.println("Alerts URL: " + urlAlerts);
     http.begin(urlAlerts);
