@@ -1,5 +1,18 @@
 # Historique des Versions (Changelog)
 
+## [2.8.0] - 2025-11-24
+### Changement Majeur : Migration vers API OpenWeatherMap Gratuite
+- **API OpenWeatherMap :** Migration complète vers les API gratuites :
+  - **Météo actuelle :** Utilisation de l'API `/data/2.5/weather` au lieu de `onecall`
+  - **Prévisions :** Utilisation de l'API `/data/2.5/forecast` (prévisions 3h sur 5 jours)
+  - **Raison :** L'API One Call 2.5 nécessite maintenant un abonnement payant
+- **Décodage JSON :** Adaptation complète du décodage pour les nouvelles structures de réponse :
+  - Extraction de `main.temp`, `main.pressure` pour la météo actuelle
+  - Calcul des min/max par jour à partir des prévisions 3h
+  - Logs de débogage détaillés pour chaque étape
+- **Alertes météo :** Temporairement désactivées (nécessitent One Call API 3.0 avec abonnement)
+- **Stabilité :** Correction du problème de valeurs à zéro grâce au nouveau décodage JSON correct
+
 ## [2.7.1] - 2025-11-24
 ### Correctif : Alertes Météo et Débogage OpenWeatherMap
 - **Page Alertes :** Modification de l'affichage "NOMINAL" → "AUCUNE" pour plus de clarté quand aucune alerte n'est active.

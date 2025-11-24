@@ -533,80 +533,138 @@ bool fetchOpenWeatherMap() {
     float latToUse = currentGPS.isValid ? currentGPS.lat : 44.8378;
     float lonToUse = currentGPS.isValid ? currentGPS.lon : -0.5792;
 
-    String url = String("https://api.openweathermap.org/data/2.5/onecall?lat=") +
-                 String(latToUse, 4) + "&lon=" + String(lonToUse, 4) +
-                 "&exclude=minutely,hourly&units=metric&appid=" + OPENWEATHER_API_KEY;
-
     Serial.println("=== OpenWeatherMap Request ===");
     Serial.printf("Coordinates: %.4f, %.4f (GPS: %s)\n", latToUse, lonToUse, currentGPS.isValid ? "Valid" : "Default");
-    Serial.println("URL: " + url);
 
-    http.begin(url);
-    int code = http.GET();
-    Serial.printf("HTTP Response Code: %d\n", code);
+    // ========================================
+    // PARTIE 1: Météo actuelle (weather API)
+    // ========================================
+    String urlWeather = String("http://api.openweathermap.org/data/2.5/weather?lat=") +
+                        String(latToUse, 4) + "&lon=" + String(lonToUse, 4) +
+                        "&units=metric&appid=" + OPENWEATHER_API_KEY;
 
-    if (code == 200) {
+    Serial.println("Weather URL: " + urlWeather);
+    http.begin(urlWeather);
+    int codeWeather = http.GET();
+    Serial.printf("Weather HTTP Code: %d\n", codeWeather);
+
+    if (codeWeather == 200) {
         String payload = http.getString();
-        Serial.printf("Payload length: %d bytes\n", payload.length());
+        Serial.printf("Weather Payload: %d bytes\n", payload.length());
 
-        JsonDocument doc;
-        DeserializationError error = deserializeJson(doc, payload);
+        JsonDocument docWeather;
+        DeserializationError error = deserializeJson(docWeather, payload);
 
         if (!error) {
-            Serial.println("JSON parsed successfully!");
+            Serial.println("Weather JSON parsed OK!");
 
-            // Vérifier la présence des données
-            apiWeather.temp = doc["current"]["temp"];
-            apiWeather.pressureMSL = doc["current"]["pressure"];
-            apiWeather.weatherCode = mapOWMtoWMO(doc["current"]["weather"][0]["id"]);
+            // Extraire les données actuelles
+            apiWeather.temp = docWeather["main"]["temp"].as<float>();
+            apiWeather.pressureMSL = docWeather["main"]["pressure"].as<float>();
+            int owmId = docWeather["weather"][0]["id"].as<int>();
+            apiWeather.weatherCode = mapOWMtoWMO(owmId);
 
-            Serial.printf("Temp: %.1f C, Pressure: %.1f hPa, Code: %d\n",
-                         apiWeather.temp, apiWeather.pressureMSL, apiWeather.weatherCode);
-
-            for(int i=0; i<3; i++) {
-                apiWeather.forecastMin[i] = doc["daily"][i+1]["temp"]["min"];
-                apiWeather.forecastMax[i] = doc["daily"][i+1]["temp"]["max"];
-                apiWeather.forecastCode[i] = mapOWMtoWMO(doc["daily"][i+1]["weather"][0]["id"]);
-            }
-
-            // Vérification des alertes
-            Serial.print("Checking alerts... ");
-            if (doc.containsKey("alerts") && doc["alerts"].is<JsonArray>()) {
-              JsonArray alerts = doc["alerts"].as<JsonArray>();
-              Serial.printf("Found %d alert(s)!\n", alerts.size());
-
-              if (alerts.size() > 0) {
-                  alertActive = true;
-                  alertMessage = doc["alerts"][0]["event"].as<String>();
-                  Serial.println("Alert: " + alertMessage);
-
-                  // Force l'affichage immédiat de la page d'alerte
-                  lastAlertActive = false; // permettre la transition
-                  currentPage = 3;
-                  beep(5, 100);
-                  drawFullPage();
-                  refreshDisplayData();
-              }
-            } else {
-              Serial.println("No alerts found in response");
-              // Pas d'alerte météo renvoyée -> on réinitialise proprement
-              alertActive = false;
-              alertMessage = "Aucune alerte";
-            }
-            http.end();
-            return true;
+            Serial.printf("Current: Temp=%.1f°C, Press=%.1fhPa, Code=%d (OWM:%d)\n",
+                         apiWeather.temp, apiWeather.pressureMSL, apiWeather.weatherCode, owmId);
         } else {
-            Serial.print("JSON parsing failed: ");
+            Serial.print("Weather JSON parse error: ");
             Serial.println(error.c_str());
+            http.end();
+            return false;
         }
     } else {
-        Serial.printf("HTTP request failed with code: %d\n", code);
-        if (code > 0) {
-            Serial.println("Response: " + http.getString());
-        }
+        Serial.printf("Weather request failed: %d\n", codeWeather);
+        http.end();
+        return false;
     }
     http.end();
-    return false;
+
+    // ========================================
+    // PARTIE 2: Prévisions (forecast API)
+    // ========================================
+    String urlForecast = String("http://api.openweathermap.org/data/2.5/forecast?lat=") +
+                         String(latToUse, 4) + "&lon=" + String(lonToUse, 4) +
+                         "&units=metric&appid=" + OPENWEATHER_API_KEY;
+
+    Serial.println("Forecast URL: " + urlForecast);
+    http.begin(urlForecast);
+    int codeForecast = http.GET();
+    Serial.printf("Forecast HTTP Code: %d\n", codeForecast);
+
+    if (codeForecast == 200) {
+        String payload = http.getString();
+        Serial.printf("Forecast Payload: %d bytes\n", payload.length());
+
+        JsonDocument docForecast;
+        DeserializationError error = deserializeJson(docForecast, payload);
+
+        if (!error) {
+            Serial.println("Forecast JSON parsed OK!");
+
+            // L'API forecast retourne des prévisions toutes les 3h
+            // On va extraire les min/max par jour
+            JsonArray list = docForecast["list"].as<JsonArray>();
+            Serial.printf("Forecast items: %d\n", list.size());
+
+            // Organiser les données par jour
+            float dayMin[4] = {999, 999, 999, 999};  // 4 jours (aujourd'hui + 3)
+            float dayMax[4] = {-999, -999, -999, -999};
+            int dayCode[4] = {0, 0, 0, 0};
+            int dayCount[4] = {0, 0, 0, 0};
+
+            // Parcourir toutes les prévisions 3h
+            for (int i = 0; i < list.size() && i < 40; i++) {  // max 40 items (5 jours)
+                JsonObject item = list[i].as<JsonObject>();
+
+                // Calculer le jour (0=aujourd'hui, 1=demain, etc.)
+                long dt = item["dt"].as<long>();
+                int dayIndex = (dt / 86400) - (millis()/1000 / 86400);  // Approximation
+                if (dayIndex < 0) dayIndex = 0;
+                if (dayIndex > 3) continue;
+
+                float temp = item["main"]["temp"].as<float>();
+                int code = item["weather"][0]["id"].as<int>();
+
+                if (temp < dayMin[dayIndex]) dayMin[dayIndex] = temp;
+                if (temp > dayMax[dayIndex]) dayMax[dayIndex] = temp;
+
+                // Prendre le code météo du milieu de la journée
+                if (dayCount[dayIndex] == 4) {  // ~12h (4 * 3h)
+                    dayCode[dayIndex] = mapOWMtoWMO(code);
+                }
+                dayCount[dayIndex]++;
+            }
+
+            // Stocker les prévisions pour J+1, J+2, J+3
+            for (int i = 0; i < 3; i++) {
+                apiWeather.forecastMin[i] = dayMin[i+1];
+                apiWeather.forecastMax[i] = dayMax[i+1];
+                apiWeather.forecastCode[i] = dayCode[i+1];
+
+                Serial.printf("Day %d: Min=%.1f, Max=%.1f, Code=%d\n",
+                             i+1, dayMin[i+1], dayMax[i+1], dayCode[i+1]);
+            }
+
+        } else {
+            Serial.print("Forecast JSON parse error: ");
+            Serial.println(error.c_str());
+            http.end();
+            return false;
+        }
+    } else {
+        Serial.printf("Forecast request failed: %d\n", codeForecast);
+        http.end();
+        return false;
+    }
+    http.end();
+
+    // Note: Les alertes ne sont pas disponibles avec l'API gratuite
+    Serial.println("Note: Alerts require One Call API 3.0 (subscription)");
+    alertActive = false;
+    alertMessage = "Aucune alerte";
+
+    Serial.println("✓ OpenWeatherMap fetch complete!");
+    return true;
 }
 
 bool fetchOpenMeteo() {

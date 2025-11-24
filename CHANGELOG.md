@@ -2,6 +2,19 @@
 
 All notable changes to this project are documented in this file.
 
+## [2.8.0] - 2025-11-24
+### Major Change: Migration to Free OpenWeatherMap APIs
+- **OpenWeatherMap API:** Complete migration to free APIs:
+  - **Current weather:** Using `/data/2.5/weather` API instead of `onecall`
+  - **Forecasts:** Using `/data/2.5/forecast` API (3-hour forecasts over 5 days)
+  - **Reason:** One Call API 2.5 now requires a paid subscription
+- **JSON Decoding:** Complete adaptation of decoding for new response structures:
+  - Extraction of `main.temp`, `main.pressure` for current weather
+  - Calculation of daily min/max from 3-hour forecasts
+  - Detailed debugging logs for each step
+- **Weather alerts:** Temporarily disabled (require One Call API 3.0 with subscription)
+- **Stability:** Fixed zero values issue with correct new JSON decoding
+
 ## [2.7.1] - 2025-11-24
 ### Patch: Weather Alerts and OpenWeatherMap Debugging
 - **Alerts Page:** Changed display from "NOMINAL" → "AUCUNE" (NONE) for better clarity when no alerts are active.
