@@ -35,11 +35,11 @@ const char index_html[] PROGMEM = R"rawliteral(
 <body>
 
 <div class="container">
-  <h1>Station M�t�o S3</h1>
-  <div class="subtitle">Dashboard Temps R�el � <span id="uptime">--</span></div>
+  <h1>Station Météo S3</h1>
+  <div class="subtitle">Dashboard Temps Réel • <span id="uptime">--</span></div>
 
   <div id="alertPanel" class="alert-box">
-    <strong>?? ALERTE M�T�O ACTIVE</strong><br>
+    <strong>⚠️ ALERTE MÉTÉO ACTIVE</strong><br>
     <span id="alertMsg">--</span>
   // Remplacé: nouvelle page complète avec diagnostics et boutons
   #ifndef WEB_PAGE_H
