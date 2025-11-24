@@ -5,6 +5,10 @@
 
 #define PROJECT_NAME "Meteo Station ESP32-S3"
 
+// ================= LANGUE METEO / ALERTES =================
+// Choix: "fr" ou "en" (utilisé pour requêtes OpenWeatherMap: descriptions + alertes)
+#define WEATHER_LANG "fr"
+
 // ================= PINS I2C =================
 #define PIN_I2C_SDA         21 
 #define PIN_I2C_SCL         20 
