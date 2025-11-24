@@ -2,6 +2,20 @@
 
 All notable changes to this project are documented in this file.
 
+## [2.8.2] - 2025-11-24
+### Patch: I2C error fix and weather alerts reactivation
+- **I2C Error:** Fixed `i2cRead returned Error -1` issue
+  - Added `bmpAvailable` flag to track if BMP280 is initialized
+  - Only attempt to read BMP280 if available
+  - Clear message if BMP280 not found
+  - Avoid unnecessary I2C calls causing the error
+- **Weather alerts:** Reactivated alert retrieval
+  - Uses One Call API 3.0 (`/data/3.0/onecall`)
+  - Displays alerts if available (requires subscription)
+  - Properly handles error codes (401 = no access)
+  - Detailed logs for diagnosis
+- **Stability:** Improved system robustness with missing device handling
+
 ## [2.8.1] - 2025-11-24
 ### Patch: Forecast calculation and debugging logs
 - **Forecasts:** Fixed daily min/max calculation (999/-999 values corrected)

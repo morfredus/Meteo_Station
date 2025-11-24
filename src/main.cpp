@@ -43,7 +43,8 @@ struct SensorData {
 
 float pressureHistory = 0.0;
 unsigned long lastPressureTime = 0;
-bool autoBrightnessMode = true; 
+bool autoBrightnessMode = true;
+bool bmpAvailable = false;  // Track si BMP280 est disponible 
 
 struct WeatherData {
   float temp = 0.0;
@@ -669,10 +670,68 @@ bool fetchOpenWeatherMap() {
     }
     http.end();
 
-    // Note: Les alertes ne sont pas disponibles avec l'API gratuite
-    Serial.println("Note: Alerts require One Call API 3.0 (subscription)");
-    alertActive = false;
-    alertMessage = "Aucune alerte";
+    // ========================================
+    // PARTIE 3: Alertes (One Call API 3.0)
+    // ========================================
+    Serial.println("\n--- Checking for Weather Alerts ---");
+    String urlAlerts = String("https://api.openweathermap.org/data/3.0/onecall?lat=") +
+                       String(latToUse, 4) + "&lon=" + String(lonToUse, 4) +
+                       "&exclude=minutely,hourly,daily&units=metric&appid=" + OPENWEATHER_API_KEY;
+
+    Serial.println("Alerts URL: " + urlAlerts);
+    http.begin(urlAlerts);
+    int codeAlerts = http.GET();
+    Serial.printf("Alerts HTTP Code: %d\n", codeAlerts);
+
+    if (codeAlerts == 200) {
+        String payload = http.getString();
+        Serial.printf("Alerts Payload: %d bytes\n", payload.length());
+
+        JsonDocument docAlerts;
+        DeserializationError error = deserializeJson(docAlerts, payload);
+
+        if (!error) {
+            Serial.println("Alerts JSON parsed OK!");
+
+            // Vérifier la présence d'alertes
+            if (docAlerts.containsKey("alerts") && docAlerts["alerts"].is<JsonArray>()) {
+                JsonArray alerts = docAlerts["alerts"].as<JsonArray>();
+                Serial.printf("Found %d alert(s)!\n", alerts.size());
+
+                if (alerts.size() > 0) {
+                    alertActive = true;
+                    alertMessage = docAlerts["alerts"][0]["event"].as<String>();
+                    Serial.println("Alert: " + alertMessage);
+
+                    // Force l'affichage immédiat de la page d'alerte
+                    lastAlertActive = false;
+                    currentPage = 3;
+                    beep(5, 100);
+                    drawFullPage();
+                    refreshDisplayData();
+                } else {
+                    alertActive = false;
+                    alertMessage = "Aucune alerte";
+                }
+            } else {
+                Serial.println("No alerts in response");
+                alertActive = false;
+                alertMessage = "Aucune alerte";
+            }
+        } else {
+            Serial.print("Alerts JSON parse error: ");
+            Serial.println(error.c_str());
+        }
+    } else if (codeAlerts == 401) {
+        Serial.println("⚠ One Call API 3.0 requires subscription (alerts disabled)");
+        alertActive = false;
+        alertMessage = "Aucune alerte";
+    } else {
+        Serial.printf("Alerts request failed: %d\n", codeAlerts);
+        alertActive = false;
+        alertMessage = "Aucune alerte";
+    }
+    http.end();
 
     Serial.println("✓ OpenWeatherMap fetch complete!");
     return true;
@@ -798,16 +857,35 @@ void drawStartupScreen() {
 
 void initSensors() {
     if(!aht.begin()) Serial.println("AHT20 ERROR");
-    if (!bmp.begin(0x76) && !bmp.begin(0x77)) localSensor.pres = NAN;
-    else bmp.setSampling(Adafruit_BMP280::MODE_NORMAL, Adafruit_BMP280::SAMPLING_X2, Adafruit_BMP280::SAMPLING_X16, Adafruit_BMP280::FILTER_X16, Adafruit_BMP280::STANDBY_MS_500);
+
+    // Essayer d'initialiser BMP280 aux deux adresses possibles
+    bmpAvailable = bmp.begin(0x76) || bmp.begin(0x77);
+
+    if (!bmpAvailable) {
+        Serial.println("BMP280 NOT FOUND - Pressure readings disabled");
+        localSensor.pres = NAN;
+    } else {
+        Serial.println("BMP280 OK");
+        bmp.setSampling(Adafruit_BMP280::MODE_NORMAL, Adafruit_BMP280::SAMPLING_X2,
+                       Adafruit_BMP280::SAMPLING_X16, Adafruit_BMP280::FILTER_X16,
+                       Adafruit_BMP280::STANDBY_MS_500);
+    }
 }
 
 void updateSensors() {
   sensors_event_t h, t; aht.getEvent(&h, &t);
   localSensor.temp = t.temperature; localSensor.hum = h.relative_humidity;
-  float p = bmp.readPressure();
-  if (!isnan(p) && p > 0) localSensor.pres = p / 100.0F;
-  updatePressureTrend(localSensor.pres);
+
+  // Lire la pression seulement si BMP280 est disponible
+  if (bmpAvailable) {
+    float p = bmp.readPressure();
+    if (!isnan(p) && p > 0) {
+      localSensor.pres = p / 100.0F;
+      updatePressureTrend(localSensor.pres);
+    }
+  } else {
+    localSensor.pres = NAN;
+  }
   
   // LDR DEBUG
   int rawLux = analogRead(PIN_LIGHT_SENSOR);

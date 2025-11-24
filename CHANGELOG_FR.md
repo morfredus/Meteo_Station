@@ -1,5 +1,19 @@
 # Historique des Versions (Changelog)
 
+## [2.8.2] - 2025-11-24
+### Correctif : Erreur I2C et réactivation des alertes météo
+- **Erreur I2C :** Correction de l'erreur `i2cRead returned Error -1`
+  - Ajout d'un flag `bmpAvailable` pour tracker si le BMP280 est initialisé
+  - Ne tente de lire le BMP280 que s'il est disponible
+  - Affiche un message clair si le BMP280 n'est pas trouvé
+  - Évite les appels I2C inutiles qui causaient l'erreur
+- **Alertes météo :** Réactivation de la récupération des alertes
+  - Utilise One Call API 3.0 (`/data/3.0/onecall`)
+  - Affiche les alertes si disponibles (nécessite abonnement)
+  - Gère proprement les codes d'erreur (401 = pas d'accès)
+  - Logs détaillés pour diagnostic
+- **Stabilité :** Amélioration de la robustesse du système avec gestion des périphériques manquants
+
 ## [2.8.1] - 2025-11-24
 ### Correctif : Calcul des prévisions et logs de débogage
 - **Prévisions :** Correction du calcul des min/max par jour (valeurs 999/-999 corrigées)
