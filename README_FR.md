@@ -12,14 +12,12 @@ L'interface utilisateur est affichée sur un écran TFT couleur et peut être co
 
 ## ✨ Fonctionnalités clés
 
-- **Interface Multi-Pages :** Navigation claire entre plusieurs écrans (7 pages) :
+- **Interface Multi-Pages :** Navigation claire entre plusieurs écrans :
   1.  **Résumé :** Météo actuelle, température, et icône dynamique.
-  2.  **Prévisions :** Météo sur 3 jours avec températures min/max.
-  3.  **Environnement :** Données des capteurs locaux (humidité, pression, luminosité, qualité de l'air).
-  4.  **Alertes Météo :** Page dédiée aux alertes météorologiques provenant d'OpenWeatherMap.
-  5.  **GPS :** Coordonnées, vitesse, altitude, et statut du fix.
-  6.  **Réseau & Système :** Informations réseau (IP, SSID, RSSI, MAC, Provider).
-  7.  **État Système :** Uptime, RAM libre, statut des alertes, et détails WiFi.
+  2.  **Environnement :** Données des capteurs locaux (humidité, pression).
+  3.  **Prévisions :** Météo sur 3 jours avec températures min/max.
+  4.  **GPS :** Coordonnées, vitesse, et statut du fix.
+  5.  **État Système :** Uptime, RAM libre, fréquence CPU, et statut WiFi.
 - **Graphismes Modernes :** Icônes météo vectorielles ("Flat Design") dessinées de manière procédurale pour un affichage net.
 - **Connectivité Avancée :**
   - **Serveur Web Asynchrone :** Interface web pour visualiser les données depuis un navigateur.

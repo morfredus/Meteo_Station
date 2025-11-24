@@ -12,14 +12,12 @@ The user interface is displayed on a color TFT screen and can be controlled via 
 
 ## ✨ Key Features
 
-- **Multi-Page Interface:** Clear navigation between several screens (7 pages):
+- **Multi-Page Interface:** Clear navigation between several screens:
   1.  **Summary:** Current weather, temperature, and a dynamic icon.
-  2.  **Forecast:** 3-day weather forecast with min/max temperatures.
-  3.  **Environment:** Data from local sensors (humidity, pressure, light, air quality).
-  4.  **Weather Alerts:** Dedicated page for weather alerts from OpenWeatherMap.
-  5.  **GPS:** Coordinates, speed, altitude, and fix status.
-  6.  **Network & System:** Network information (IP, SSID, RSSI, MAC, Provider).
-  7.  **System Status:** Uptime, free RAM, alert status, and WiFi details.
+  2.  **Environment:** Data from local sensors (humidity, pressure).
+  3.  **Forecast:** 3-day weather forecast with min/max temperatures.
+  4.  **GPS:** Coordinates, speed, and fix status.
+  5.  **System Status:** Uptime, free RAM, CPU frequency, and WiFi status.
 - **Modern Graphics:** Procedurally drawn "Flat Design" vector weather icons for a crisp display.
 - **Advanced Connectivity:**
   - **Asynchronous Web Server:** A web interface to view data from a browser.
