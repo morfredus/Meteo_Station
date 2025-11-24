@@ -533,7 +533,7 @@ bool fetchOpenWeatherMap() {
     float latToUse = currentGPS.isValid ? currentGPS.lat : 44.8378;
     float lonToUse = currentGPS.isValid ? currentGPS.lon : -0.5792;
 
-    String url = String("https://api.openweathermap.org/data/2.5/onecall?lat=") +
+    String url = String("http://api.openweathermap.org/data/2.5/forecast?lat=") +
                  String(latToUse, 4) + "&lon=" + String(lonToUse, 4) +
                  "&exclude=minutely,hourly&units=metric&appid=" + OPENWEATHER_API_KEY;
 
