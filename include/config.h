@@ -27,8 +27,8 @@
 #define NEOPIXEL_BRIGHTNESS 30   
 
 // Boutons
-#define PIN_BUTTON_PAGE     1    
-#define PIN_BUTTON_ACTION   2    
+#define PIN_BUTTON_1     1   
+#define PIN_BUTTON_2	 2    
 
 // Buzzer
 #define PIN_BUZZER          3
