@@ -134,10 +134,10 @@ void setup() {
   
   Serial.println("\n--- BOOTING STATION v" + String(PROJECT_VERSION) + " ---");
 
-  pinMode(PIN_BUTTON_PAGE, INPUT_PULLUP);
-  pinMode(PIN_BUTTON_ACTION, INPUT_PULLUP);
-  attachInterrupt(digitalPinToInterrupt(PIN_BUTTON_PAGE), isrPageBtn, FALLING);
-  attachInterrupt(digitalPinToInterrupt(PIN_BUTTON_ACTION), isrActionBtn, FALLING);
+  pinMode(PIN_BUTTON_1, INPUT_PULLUP);
+  pinMode(PIN_BUTTON_2, INPUT_PULLUP);
+  attachInterrupt(digitalPinToInterrupt(PIN_BUTTON_1), isrPageBtn, FALLING);
+  attachInterrupt(digitalPinToInterrupt(PIN_BUTTON_2), isrActionBtn, FALLING);
 
   pinMode(PIN_BUZZER, OUTPUT);
   #ifndef BUZZER_LEDC_CHANNEL
